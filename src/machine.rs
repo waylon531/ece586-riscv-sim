@@ -1,3 +1,5 @@
+use crate::register::Register;
+
 struct Machine {
     // Maybe this should be on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
@@ -20,28 +22,13 @@ impl Machine {
 
     }
     pub fn set_reg(&mut self,reg: Register, value: u32) {
-        unimplemented!()
-    }
-}
+        let reg_num = reg.to_num();
+        // Writes to the zero register are NOPs
+        if reg_num == 0 {
+            return
+        } else {
+            self.registers[reg_num - 1] = value;
+        }
 
-//Should all the ABI register names go in here too?
-enum Register {
-    Zero,
-    RA,
-    SP,
-    GP,
-    TP,
-    T0,T1,T2,T3,T4,T5,T6,
-    // These are two names for the same reg
-    S0,FP,
-    S1,S2,S3,S4,S5,S6,S7,S8,S9,S10,S11,
-    A0,A1,A2,A3,A4,A5,A6,A7,
-}
-impl Register {
-    fn to_num(&self) -> usize {
-        unimplemented!()
-    }
-    pub fn from_num(num: usize) -> Register {
-        unimplemented!()
     }
 }

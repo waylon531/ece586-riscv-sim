@@ -1,4 +1,6 @@
 mod machine;
+mod opcode;
+mod register;
 use clap::Parser;
 
 #[derive(Parser)]
