@@ -49,7 +49,7 @@ impl Register {
             T6 => 31,
         }
     }
-    pub fn from_num(num: usize) -> Option<Register> {
+    pub fn from_num(num: u32) -> Option<Register> {
         use Register::*;
         match num {
             0 => Some(Zero),
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn test_reg_num_conversion() {
         for i in 0..32 {
-            assert_eq!(i, Register::from_num(i).unwrap().to_num());
+            assert_eq!(i, Register::from_num(i as u32).unwrap().to_num());
         }
     }
 }

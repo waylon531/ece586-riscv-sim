@@ -1,4 +1,5 @@
 use crate::register::Register;
+use crate::decode::{InstructionType,ParseError,bytes_to_u32};
 
 // I'm not sure where sign extension should happen, but it's probably fine to do it in the VM
 // Maybe there could be different types of immediates here depending on the size?
@@ -72,4 +73,50 @@ enum Operation {
     // Generic performance hint, we don't need to store any information for them
     // and they are effectively NOPs
     HINT
+}
+impl Operation {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self,ParseError> {
+        use InstructionType::*;
+        use Operation::*;
+        let combined = bytes_to_u32(bytes);
+        // NOTE: Sign extension should happen here for immediates
+        Ok(match InstructionType::from_bytes(bytes) {
+            Ok(RType {
+                rd, rs1, rs2, funct3, funct7, opcode
+            }) => {
+                match opcode {
+                    0b0110011 => {
+                        // This can be ADD, SUB, SLL, SLT, SLTU, XOR
+                        match (funct3, funct7) {
+                            (0,0) => ADD(rd,rs1,rs2),
+                            (0,0b0100000) => SUB(rd,rs1,rs2),
+                            (0b001,0) => SLL(rd,rs1,rs2),
+                            (0b010,0) => SLT(rd,rs1,rs2),
+                            (0b011,0) => SLTU(rd,rs1,rs2),
+                            (0b100,0) => XOR(rd,rs1,rs2),
+                            (0b101,0) => SRL(rd,rs1,rs2),
+                            (0b101,0b0100000) => SRA(rd,rs1,rs2),
+                            (0b110,0) => OR(rd,rs1,rs2),
+                            (0b111,0) => AND(rd,rs1,rs2),
+                            _ => return Err(ParseError::InvalidInstruction(combined))
+                        }
+
+                    },
+                    _ => unimplemented!() //Should return error
+                }
+            },
+            Ok(IType {
+                rd, rs1, imm, funct3, opcode
+            }) => {
+                unimplemented!()
+
+            },
+            _ => {unimplemented!()}
+
+
+
+        })
+
+    }
+
 }

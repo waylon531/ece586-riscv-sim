@@ -1,3 +1,4 @@
+mod decode;
 mod machine;
 mod opcode;
 mod register;
