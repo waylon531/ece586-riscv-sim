@@ -1,3 +1,6 @@
+use std::ops::{Index,IndexMut};
+
+#[derive(PartialEq)]
 pub enum Register {
     Zero,
     RA,
@@ -88,6 +91,29 @@ impl Register {
         }
     }
 }
+
+impl Index<Register> for [u32] {
+    type Output = u32;
+
+    fn index(&self, index: Register) -> &Self::Output {
+        // Accessing the zero register always returns 0
+        if index == Register::Zero {
+            &0
+        // Or it offsets the index by one, because the zero register is skipped 
+        // and not contained in a slice
+        } else {
+            self.index(index.to_num() as usize -1)
+        }
+    }
+}
+
+// We don't really ever want to return an &mut for registor Zero
+// so this doesn't work
+//impl<T> IndexMut<Register> for [T] {
+//    fn index_mut(&mut self, index: Register) -> &mut Self::Output {
+//        self.index_mut(index.to_num() as usize)
+//    }
+//}
 
 #[cfg(test)]
 mod tests {
