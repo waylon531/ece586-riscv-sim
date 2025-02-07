@@ -53,7 +53,7 @@ impl Machine {
     }
     pub fn read_byte(&self, addr: u32) -> Result<u8,ExecutionError>{
         //TODO in future: check if this is a memory mapped device
-        if addr < self.memory_top {
+        if addr < self.memory_top || self.memory_top == 0 {
             Ok(self.memory[addr as usize])
         } else {
             Err(ExecutionError::LoadAccessFault(addr))
@@ -62,7 +62,7 @@ impl Machine {
     }
     pub fn read_word(&self, addr: u32) -> Result<u32, ExecutionError>{
         //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(4) <= self.memory_top {
+        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
             Ok(
                 self.memory[addr as usize] as u32 
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u32) << 8)
@@ -76,7 +76,7 @@ impl Machine {
     }
     pub fn read_halfword(&self, addr: u32) -> Result<u16, ExecutionError>{
         //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(2) <= self.memory_top {
+        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             Ok(
                 self.memory[addr as usize] as u16 
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u16) << 8)
@@ -87,7 +87,7 @@ impl Machine {
 
     }
     pub fn store_byte(&mut self, data: u8, addr: u32) -> Result<(),ExecutionError> {
-        if addr < self.memory_top {
+        if addr < self.memory_top || self.memory_top == 0{
             self.memory[addr as usize] = data;
             Ok(())
         } else {
@@ -96,7 +96,7 @@ impl Machine {
         
     }
     pub fn store_halfword(&mut self, data: u16, addr: u32) -> Result<(),ExecutionError> {
-        if addr.saturating_add(2) <= self.memory_top {
+        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             Ok(())
@@ -106,7 +106,7 @@ impl Machine {
     }
 
     pub fn store_word(&mut self, data: u32, addr: u32) -> Result<(),ExecutionError> {
-        if addr.saturating_add(4) <= self.memory_top {
+        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0{
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             self.memory[addr.overflowing_add(2).0 as usize] = (data >> 16) as u8;
