@@ -4,9 +4,9 @@ use crate::decode::{InstructionType,ParseError,bytes_to_u32};
 // I'm not sure where sign extension should happen, but it's probably fine to do it in the VM
 // Maybe there could be different types of immediates here depending on the size?
 // Which instructions sign-extend the immediate?
-type Immediate = usize;
+type Immediate = i32;
 
-enum Operation {
+pub enum Operation {
     // Immediate, register, register instructions
     // RD is first
     ADDI(Register,Register,Immediate),
