@@ -174,6 +174,15 @@ impl Operation {
                     _ => return Err(ParseError::InvalidInstruction(combined))
                 }
             },
+            Ok(UType {
+                rd, imm, opcode
+            }) => {
+                match opcode {
+                    0b0110111 => LUI(rd,imm),
+                    0b0010111 => AUIPC(rd,imm),
+                    _ => return Err(ParseError::InvalidInstruction(combined))
+                }
+            },
             _ => {unimplemented!()}
 
 
