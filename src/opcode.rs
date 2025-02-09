@@ -134,13 +134,27 @@ impl Operation {
                             0b100 => XORI(rd,rs1,imm),
                             0b110 => ORI(rd,rs1,imm),
                             0b111 => ANDI(rd,rs1,imm),
-                            - => return Err(ParseError::InvalidInstruction(combined))
+                            _ => return Err(ParseError::InvalidInstruction(combined))
                         }
                     },
                     _ => return Err(ParseError::InvalidOpcode(opcode))
                 }
             },
-            
+            Ok(SType {
+                rs1, rs2, imm, funct3, opcode
+            }) => {
+                match opcode {
+                    0b0100011 => {
+                        match funct3 {
+                            0b000 => SB(rs2,rs1,imm),
+                            0b001 => SH(rs2,rs1,imm),
+                            0b010 => SW(rs2,rs1,imm),
+                            _ => return Err(ParseError::InvalidInstruction(combined))
+                        }
+                    }
+                    _ => return Err(ParseError::InvalidInstruction(combined))
+                }
+            }
             _ => {unimplemented!()}
 
 
