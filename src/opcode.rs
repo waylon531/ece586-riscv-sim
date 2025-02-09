@@ -42,6 +42,7 @@ pub enum Operation {
     JALR(Register, Register, Immediate),
 
     // Conditional branches
+    // Which register is first, rs1 or rs2?
     BEQ(Register,Register,Immediate),
     BNE(Register,Register,Immediate),
     BLT(Register,Register,Immediate),
@@ -154,7 +155,25 @@ impl Operation {
                     }
                     _ => return Err(ParseError::InvalidInstruction(combined))
                 }
-            }
+            },
+            Ok(BType {
+                rs1, rs2, imm, funct3, opcode
+            }) => {
+                match opcode {
+                    0b1100011 => {
+                        match funct3 {
+                            0b000 => BEQ(rs1,rs2,imm), // or rs2 first?
+                            0b001 => BNE(rs1,rs2,imm),
+                            0b100 => BLT(rs1,rs2,imm),
+                            0b101 => BGE(rs1,rs2,imm),
+                            0b110 => BLTU(rs1,rs2,imm),
+                            0b111 => BGEU(rs1,rs2,imm),
+                            _ => return Err(ParseError::InvalidInstruction(combined))
+                        }
+                    }
+                    _ => return Err(ParseError::InvalidInstruction(combined))
+                }
+            },
             _ => {unimplemented!()}
 
 
