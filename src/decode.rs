@@ -20,15 +20,15 @@ pub enum InstructionType {
     SType{
         rs1: Register,
         rs2: Register,
-        funct3: u8,
         imm: u32,
+        funct3: u8,
         opcode: u8
     },
     BType{
         rs1: Register,
         rs2: Register,
-        funct3: u8,
         imm: u32,
+        funct3: u8,
         opcode: u8
     },
     UType{
