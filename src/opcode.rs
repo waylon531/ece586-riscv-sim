@@ -80,6 +80,7 @@ impl Operation {
         use Operation::*;
         let combined = bytes_to_u32(bytes);
         // NOTE: Sign extension should happen here for immediates
+        
         Ok(match InstructionType::from_bytes(bytes) {
             Ok(RType {
                 rd, rs1, rs2, funct3, funct7, opcode

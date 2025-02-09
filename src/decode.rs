@@ -18,7 +18,6 @@ pub enum InstructionType {
         opcode: u8
     },
     SType{
-        rd: Register, 
         rs1: Register,
         rs2: Register,
         funct3: u8,
@@ -26,7 +25,6 @@ pub enum InstructionType {
         opcode: u8
     },
     BType{
-        rd: Register, 
         rs1: Register,
         rs2: Register,
         funct3: u8,
