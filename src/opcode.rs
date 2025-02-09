@@ -183,6 +183,14 @@ impl Operation {
                     _ => return Err(ParseError::InvalidInstruction(combined))
                 }
             },
+            Ok(JType {
+                rd, imm, opcode
+            }) => {
+                match opcode {
+                    0b1101111 => JAL(rd,imm),
+                    _ => return Err(ParseError::InvalidInstruction(combined))
+                }
+            },
             _ => {unimplemented!()}
 
 
