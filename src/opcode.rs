@@ -100,17 +100,46 @@ impl Operation {
                             (0b111,0) => AND(rd,rs1,rs2),
                             _ => return Err(ParseError::InvalidInstruction(combined))
                         }
-
                     },
-                    _ => unimplemented!() //Should return error
+                    _ => return Err(ParseError::InvalidOpcode(opcode)) // use `op` instead of _?
                 }
             },
             Ok(IType {
                 rd, rs1, imm, funct3, opcode
             }) => {
-                unimplemented!()
-
+                match opcode {
+                    // JALR only
+                    0b1100111 => {
+                        match funct3 {
+                            0b000 => JALR(rd,rs1,imm),
+                            _ => return Err(ParseError::InvalidInstruction(combined))
+                        }
+                    },
+                    0b0000011 => {
+                        match funct3 {
+                            0b000 => LB(rd,rs1,imm),
+                            0b001 => LH(rd,rs1,imm),
+                            0b010 => LW(rd,rs1,imm),
+                            0b100 => LBU(rd,rs1,imm),
+                            0b101 => LHU(rd,rs1,imm),
+                            _ => return Err(ParseError::InvalidInstruction(combined))
+                        }
+                    },
+                    0b0010011 => {
+                        match funct3 {
+                            0b000 => ADDI(rd,rs1,imm),
+                            0b010 => SLTI(rd,rs1,imm),
+                            0b011 => SLTIU(rd,rs1,imm),
+                            0b100 => XORI(rd,rs1,imm),
+                            0b110 => ORI(rd,rs1,imm),
+                            0b111 => ANDI(rd,rs1,imm),
+                            - => return Err(ParseError::InvalidInstruction(combined))
+                        }
+                    },
+                    _ => return Err(ParseError::InvalidOpcode(opcode))
+                }
             },
+            
             _ => {unimplemented!()}
 
 
