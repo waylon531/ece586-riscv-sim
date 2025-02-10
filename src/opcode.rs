@@ -4,7 +4,11 @@ use crate::decode::{InstructionType,ParseError,bytes_to_u32};
 // I'm not sure where sign extension should happen, but it's probably fine to do it in the VM
 // Maybe there could be different types of immediates here depending on the size?
 // Which instructions sign-extend the immediate?
-type Immediate = i32;
+// type Immediate = i32;
+
+pub enum Immediate {
+    
+}
 
 pub enum Operation {
     // Immediate, register, register instructions
@@ -75,6 +79,7 @@ pub enum Operation {
     // and they are effectively NOPs
     HINT
 }
+
 impl Operation {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self,ParseError> {
         use InstructionType::*;
