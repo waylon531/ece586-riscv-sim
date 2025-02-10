@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
 #[derive(PartialEq)]
 pub enum Register {
