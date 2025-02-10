@@ -1,4 +1,4 @@
-use crate::decode::{bytes_to_u32, InstructionType, ParseError};
+use crate::decode::{bytes_to_u32, InstructionType, ParseError, bitrange};
 use crate::register::Register;
 
 // I'm not sure where sign extension should happen, but it's probably fine to do it in the VM
@@ -124,6 +124,8 @@ impl Operation {
                 funct3,
                 opcode,
             }) => {
+                // note that `imm` (unsigned) is used for SLLI, SR[L|A]I
+                // all other instrs sign-extend as per manual
                 let imm_s: Immediate = sign_extend(imm, 12);
                 match opcode {
                     // JALR only
@@ -140,6 +142,22 @@ impl Operation {
                         _ => return Err(ParseError::InvalidInstruction(combined)),
                     },
                     0b0010011 => match funct3 {
+                        // this may need refactoring...
+                        0b001 | 0b101 => {
+                            let shamt = bitrange(imm,0,4) as i32;
+                            match funct3 {
+                                0b001 => SLLI(rd,rs1,shamt),
+                                0b101 => {
+                                    let b: i32 = (imm >> 10) as i32;
+                                    match b {
+                                        0b0 => SRLI(rd,rs1,shamt),
+                                        0b1 => SRAI(rd,rs1,shamt),
+                                        _ => return Err(ParseError::InvalidInstruction(combined)),
+                                    }
+                                },
+                                _ => return Err(ParseError::InvalidInstruction(combined)),
+                            }
+                        },
                         0b000 => ADDI(rd, rs1, imm_s),
                         0b010 => SLTI(rd, rs1, imm_s),
                         0b011 => SLTIU(rd, rs1, imm_s),
