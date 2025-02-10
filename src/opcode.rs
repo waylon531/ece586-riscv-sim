@@ -191,12 +191,8 @@ impl Operation {
                     _ => return Err(ParseError::InvalidInstruction(combined))
                 }
             },
-            _ => {unimplemented!()}
-
-
-
+            // cargo check complains about type mismatch when I omit the return keyword
+            _ => { return Err(ParseError::InvalidFormat(combined)) },
         })
-
     }
-
 }

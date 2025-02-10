@@ -50,7 +50,7 @@ impl InstructionType {
         let combined = bytes_to_u32(bytes);
         // Some of these have to look at both opcode and func3
         match opcode {
-            // List out all RType opcodes here, seperated by |
+            // List out all RType opcodes here, separated by |
             0b0110011 => {
                 Ok(InstructionType::RType {
                     rd: Register::from_num(bitrange(combined,7,11))
@@ -103,6 +103,8 @@ pub enum ParseError {
     InvalidInstruction(u32),
     #[error("Invalid opcode: {0:#x}")]
     InvalidOpcode(u8),
+    #[error("Invalid format: {0:#x}")] // not sure if correct formatting
+    InvalidFormat(u32),
 }
 
 #[cfg(test)]
