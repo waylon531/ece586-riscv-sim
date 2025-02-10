@@ -2,13 +2,18 @@ use crate::decode::ParseError;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use std::fmt::Write;
+
 use thiserror::Error;
 
-struct Machine {
+pub struct Machine {
     // Maybe this should be on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
     // we can load?
-    memory: [u8; 64 * 1024],
+    //
+    // NOTE: This is a boxed slice, while it could well be a Vec for simplicity
+    // we also really don't want to have someone resizing the mmap
+    memory: Box<[u8]>,
     // The top of memory, points right above the last usable address
     memory_top: u32,
     // Store x1-x31
@@ -17,17 +22,30 @@ struct Machine {
     pc: u32,
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: u32, memory_top: u32) -> Self {
+    pub fn new(starting_addr: u32, stack_addr: u32, memory_top: u32, memmap: Box<[u8]>) -> Self{
         let mut m = Machine {
-            memory: [0; 64 * 1024],
-            registers: [0; 31],
-            memory_top,
-            pc: starting_addr,
+                    memory: memmap,
+                    registers: [0;31],
+                    memory_top,
+                    pc: starting_addr
         };
         m.set_reg(Register::SP, stack_addr);
         m
     }
-    pub fn set_reg(&mut self, reg: Register, value: u32) {
+    // String formatting should never fail, it's likely safe to unwrap here
+    pub fn display_info(&self) -> String {
+        let mut buf = String::new();
+        write!(buf,"PC: {:#x}", self.pc).unwrap();
+        for i in 0 .. 31 {
+            write!(buf,"X{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
+        }
+        // TODO: Print a little bit of memory context, around where the stack is
+        // And some instruction context as well
+
+        buf
+
+    }
+    pub fn set_reg(&mut self,reg: Register, value: u32) {
         let reg_num = reg.to_num();
         // Writes to the zero register are NOPs
         if reg_num == 0 {
@@ -44,7 +62,7 @@ impl Machine {
             Err(ExecutionError::InstructionAddressMisaligned(addr))
         // If the memory top is zero then assume we are using the full 4GB address space as memory
         } else if self.memory_top == 0 || addr.overflowing_add(4).0 <= self.memory_top {
-            Ok(&self.memory[addr as usize..addr as usize + 3])
+            Ok(&self.memory[addr as usize .. addr as usize + 4])
         } else {
             Err(ExecutionError::InstructionAccessFault(addr))
         }
@@ -194,7 +212,12 @@ impl Machine {
                 increment_pc = false;
             }
             JALR(rd, rs1, imm) => {
-                self.set_reg(rd, self.pc.overflowing_add(4).0);
+                // A RET to address zero will stop execution
+                // The a0 register contains the status code to return
+                if rs1 == Register::RA && self.registers[Register::RA] == 0 {
+                    return Err(ExecutionError::FinishedExecution(self.registers[Register::A0] as u8))
+                }
+                self.set_reg(rd,self.pc.overflowing_add(4).0);
                 // Add imm to rs1 and zero out lowest bit
                 self.pc = self.registers[rs1].overflowing_add(imm as u32).0 & (!1);
                 increment_pc = false;
@@ -279,7 +302,7 @@ impl Machine {
             ECALL => {}
 
             // Breakpoint for us
-            EBREAK => {}
+            EBREAK => return Err(ExecutionError::Breakpoint(self.pc)),
 
             // Does this actually need an opcode? It's the same as ADDI zero, zero, 0
             NOP => {}
@@ -298,7 +321,7 @@ impl Machine {
 }
 
 #[derive(Error, Debug)]
-enum ExecutionError {
+pub enum ExecutionError {
     #[error("Failed to decode instruction: {0}")]
     ParseError(#[from] ParseError),
     #[error("Exception while loading value at address {0:#x}")]
@@ -307,4 +330,10 @@ enum ExecutionError {
     InstructionAccessFault(u32),
     #[error("Tried to read misaligned instruction at {0:#x}")]
     InstructionAddressMisaligned(u32),
+    #[error("Breakpoint hit at address {0:#x}")]
+    Breakpoint(u32),
+    // This isn't really an error, but it is an exceptional condition
+    // maybe could be represented a different way but this is easy
+    #[error("Successfully finished execution")]
+    FinishedExecution(u8),
 }
