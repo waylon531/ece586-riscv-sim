@@ -37,7 +37,7 @@ impl Machine {
         let mut buf = String::new();
         write!(buf,"PC: {:#x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"X{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
+            write!(buf,"\n\rX{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
@@ -336,4 +336,22 @@ pub enum ExecutionError {
     // maybe could be represented a different way but this is easy
     #[error("Successfully finished execution")]
     FinishedExecution(u8),
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_write_u32() {
+        let mut machine = Machine::new(0,0,8,vec![0;4].into_boxed_slice());
+        machine.store_word(0xBEE5AA11,0).unwrap();
+        for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
+            assert_eq!(mem_value,test_value);
+        }
+        
+
+    }
+
 }

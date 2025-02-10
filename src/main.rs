@@ -49,7 +49,8 @@ fn main() -> std::io::Result<ExitCode> {
     let _ = machine.store_word(store_a0_42 as u32,0);
     // JALR to RA
     let ret = 0b1100111 | (Register::RA.to_num() << 15) ;
-    let _ = machine.store_word(ret as u32,0);
+    let _ = machine.store_word(ret as u32,4);
+
 
     // Either run the machine in single-step mode or all at once
     // maybe TODO: Move this out to another function so we can do better error handling
