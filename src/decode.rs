@@ -132,7 +132,7 @@ pub fn bitrange(num: u32, start: usize, end: usize) -> u32 {
     (num >> start) & ((1 << (1 + end - start)) - 1)
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ParseError {
     #[error("Invalid register: {0}")]
     RegisterDecode(u32),

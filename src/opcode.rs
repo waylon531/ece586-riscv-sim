@@ -13,6 +13,7 @@ pub fn sign_extend(num: u32, bits: u8) -> Immediate {
     res
 }
 
+#[derive(Debug)]
 pub enum Operation {
     // Immediate, register, register instructions
     // RD is first
@@ -179,9 +180,9 @@ impl Operation {
                 let imm_s: Immediate = sign_extend(imm, 12);
                 match opcode {
                     0b0100011 => match funct3 {
-                        0b000 => SB(rs2, rs1, imm_s),
-                        0b001 => SH(rs2, rs1, imm_s),
-                        0b010 => SW(rs2, rs1, imm_s),
+                        0b000 => SB(rs1, rs2, imm_s),
+                        0b001 => SH(rs1, rs2, imm_s),
+                        0b010 => SW(rs1, rs2, imm_s),
                         _ => return Err(ParseError::InvalidInstruction(combined)),
                     },
                     _ => return Err(ParseError::InvalidInstruction(combined)),

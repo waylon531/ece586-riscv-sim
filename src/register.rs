@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Register {
     Zero,
     RA,
