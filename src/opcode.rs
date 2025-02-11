@@ -223,8 +223,8 @@ impl Operation {
                     _ => return Err(ParseError::InvalidInstruction(combined)),
                 }
             }
-            // cargo check complains about type mismatch when I omit the return keyword
-            _ => return Err(ParseError::InvalidFormat(combined)),
+            // Bubble the error from opcode parsing up
+            Err(e) => return Err(e),
         })
     }
 }
