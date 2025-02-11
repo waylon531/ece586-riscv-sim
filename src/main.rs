@@ -3,14 +3,16 @@ mod machine;
 mod opcode;
 mod register;
 
-use register::Register;
 use machine::{Machine,ExecutionError};
 
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
+use thiserror::Error;
 
 use clap::Parser;
-use std::io::{stdin, stdout, Write, Stdin};
+use std::fs::File;
+use std::io::{stdin, stdout, Write, Stdin, BufReader, BufRead};
+use std::num;
 use std::process::ExitCode;
 
 #[derive(Parser)]
@@ -40,17 +42,19 @@ fn main() -> std::io::Result<ExitCode> {
     let mut stdout = stdout().into_raw_mode().unwrap();
     
     let capacity = if cli.memory_top == 0 { 4*1024*1024*1024 } else { cli.memory_top  as usize} ;
-    let mmap = vec![0; capacity].into_boxed_slice();
+    let mut mmap = vec![0; capacity];
 
     // TODO: set up machine mmap in a real way instead of this jank
+    match parse_file(&mut mmap, &cli.filename) {
+        Ok(()) => {},
+        Err(ReadFileError::IoError(e)) => return Err(e),
+        Err(e) => {
+            eprintln!("{}",e);
+            return Ok(ExitCode::FAILURE)
+        }
+    }
 
-    let mut machine = Machine::new(cli.starting_addr, cli.stack_addr, cli.memory_top, mmap);
-    let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
-    let _ = machine.store_word(store_a0_42 as u32,0);
-    // JALR to RA
-    let ret = 0b1100111 | (Register::RA.to_num() << 15) ;
-    let _ = machine.store_word(ret as u32,4);
-
+    let mut machine = Machine::new(cli.starting_addr, cli.stack_addr, cli.memory_top, mmap.into_boxed_slice());
 
     // Either run the machine in single-step mode or all at once
     // maybe TODO: Move this out to another function so we can do better error handling
@@ -109,4 +113,34 @@ fn main() -> std::io::Result<ExitCode> {
 // NOTE: throws away errors silently
 fn wait_for_keypress<>(stdin: &Stdin) {
     let _ = stdin.lock().keys().next();
+}
+
+fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(),ReadFileError> {
+    let f = File::open(filename)?;
+    let reader = BufReader::new(f);
+    for line in reader.lines() {
+    
+        let line = line?;
+        let (addr, data) = (&line).split_once(":").ok_or(ReadFileError::ParseError(line.clone()))?;
+        let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
+        let data = u32::from_str_radix(data.trim(), 16)?;
+        bytes[addr] = data as u8;
+        bytes[addr + 1 as usize] = (data >> 8) as u8;
+        bytes[addr + 2 as usize] = (data >> 16) as u8;
+        bytes[addr + 3 as usize] = (data >> 24) as u8;
+
+
+    }
+    Ok(())
+
+}
+
+#[derive(Error, Debug)]
+pub enum ReadFileError {
+    #[error("Failed to parse line: {0}")]
+    ParseError(String),
+    #[error("IO ERROR: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Failed to parse number: {0}")]
+    ParseIntError(#[from] num::ParseIntError)
 }
