@@ -15,6 +15,7 @@ use std::io::{stdin, stdout, Write, Stdin, BufReader, BufRead};
 use std::num;
 use std::process::ExitCode;
 
+// TODO: memory top maybe could be a string? For 1GB? Etc
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -26,7 +27,7 @@ struct Cli {
     filename: String,
     #[arg(short = 'a', long, default_value_t = 0)]
     starting_addr: u32,
-    #[arg(short = 's', long, default_value_t = 65536)]
+    #[arg(short = 's', long, default_value_t = 64*1024)]
     stack_addr: u32,
     #[arg(short = 'm', long, default_value_t = 64*1024)]
     memory_top: u32,
@@ -123,6 +124,8 @@ fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(),ReadFileError> {
         let line = line?;
         let (addr, data) = (&line).split_once(":").ok_or(ReadFileError::ParseError(line.clone()))?;
         let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
+        // TODO: can have byte and word strings
+        // look for number of characters
         let data = u32::from_str_radix(data.trim(), 16)?;
         bytes[addr] = data as u8;
         bytes[addr + 1 as usize] = (data >> 8) as u8;

@@ -35,9 +35,9 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"PC: {:#x}", self.pc).unwrap();
+        write!(buf,"\rPC: {:#x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\rX{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
+            write!(buf,"\n\r{1:?}: {0} {0:#x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
