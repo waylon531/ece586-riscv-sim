@@ -58,7 +58,7 @@ impl Machine {
     // These 4 functions could probably be more modular ...
     pub fn read_instruction_bytes(&self, addr: u32) -> Result<&[u8], ExecutionError> {
         // Error out if the address is not aligned on a 32-bit boundary
-        if addr & 0x11 != 0 {
+        if addr & 0b11 != 0 {
             Err(ExecutionError::InstructionAddressMisaligned(addr))
         // If the memory top is zero then assume we are using the full 4GB address space as memory
         } else if self.memory_top == 0 || addr.overflowing_add(4).0 <= self.memory_top {
