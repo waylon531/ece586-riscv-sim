@@ -320,7 +320,7 @@ impl Machine {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ExecutionError {
     #[error("Failed to decode instruction: {0}")]
     ParseError(#[from] ParseError),
@@ -350,8 +350,53 @@ mod tests {
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
         }
-        
+    }
 
+    #[test]
+    fn test_program_completion() {
+        let mut machine = Machine::new(0, 0, 32, vec![0; 32].into_boxed_slice());
+        let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
+        let _ = machine.store_word(store_a0_42 as u32,0);
+        // JALR to RA
+        let ret = 0b1100111 | (Register::RA.to_num() << 15) ;
+        let _ = machine.store_word(ret as u32,4);
+
+        machine.step().unwrap();
+        assert_eq!(machine.step(),Err(ExecutionError::FinishedExecution(42)))
+
+
+    }
+    use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn load_store_byte_asm(data: u8, s in 16u32..(1<<12)) {
+            let mut machine = Machine::new(0, 0, s+4, vec![0; s as usize+4].into_boxed_slice());
+            let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
+            let _ = machine.store_word(store_a0_42 as u32,0);
+            println!("S: {}",s);
+
+            // Store the data byte in s
+            let sb: u32 = 0b0100011 | ((Register::T1.to_num()as u32) << 20) 
+                | ((s & 0x1F) << 7) | ((s & 0xFE0)<<20);
+            let _ = machine.store_word(sb, 4);
+            println!("SB: {:08x}",sb);
+            println!("TOP: {:08x}",(s & 0xFE0)<<20);
+
+            let lb: u32 = 0b0000011 | ((Register::A0.to_num()as u32) << 7) | (s << 20);
+            let _ = machine.store_word(lb,8);
+
+            // JALR to RA
+            let ret = 0b1100111 | (Register::RA.to_num() << 15) ;
+            let _ = machine.store_word(ret as u32,12);
+
+            for i in 0 .. 4 {
+                println!("{:?}",Operation::from_bytes(machine.read_instruction_bytes(i*4)?));
+            }
+            machine.step().unwrap();
+            machine.step().unwrap();
+            machine.step().unwrap();
+            assert_eq!(machine.step(),Err(ExecutionError::FinishedExecution(data)))
+        }
     }
 
 }

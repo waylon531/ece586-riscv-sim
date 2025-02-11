@@ -7,3 +7,6 @@ edition = "2021"
 clap = { version = "4.5.27", features = ["derive"] }
 termion = "4.0.3"
 thiserror = "2"
+
+[dev-dependencies]
+proptest = "1.0.0"
