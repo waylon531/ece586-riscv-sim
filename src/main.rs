@@ -2,6 +2,7 @@ mod decode;
 mod machine;
 mod opcode;
 mod register;
+mod webui;
 
 use register::Register;
 use machine::{Machine,ExecutionError};
@@ -12,8 +13,9 @@ use termion::raw::IntoRawMode;
 use clap::Parser;
 use std::io::{stdin, stdout, Write, Stdin};
 use std::process::ExitCode;
+use std::thread;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
     #[arg(short, long)]
@@ -28,17 +30,38 @@ struct Cli {
     stack_addr: u32,
     #[arg(short = 'm', long, default_value_t = 64*1024)]
     memory_top: u32,
+    #[arg(short = 'W')]
+    web_ui: bool,
 
 }
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
+    // if we're not running the web ui
+    if !cli.web_ui {
+        // just launch into the simulator
+        return run_simulator(cli);
+    }
+    // otherwise, run simulator and web server in separate threads
+    let simulator_thread = thread::spawn(|| {
+        run_simulator(cli);
+    });
+    let web_server_thread = thread::spawn(|| {
+        webui::run_server();
+    });
+    web_server_thread.join().unwrap();
+    simulator_thread.join().unwrap();
+    // TODO: replace this with exit code of simulator
+    return Ok(ExitCode::from(0));
+}
+
+fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
 
 
     // Set up input and output
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
-    
+
     let capacity = if cli.memory_top == 0 { 4*1024*1024*1024 } else { cli.memory_top  as usize} ;
     let mmap = vec![0; capacity].into_boxed_slice();
 
