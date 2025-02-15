@@ -33,7 +33,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = "./riscvSim testResources/memImages/" + testName + ".mem > " + simResultFilename;
+    std::string cmd = "~/ece586-riscv-sim/riscvSim testResources/memImages/" + testName + ".mem 0 65536 > " + simResultFilename;
     system(cmd.c_str());
     parseResult();
     return pass;
