@@ -18,7 +18,7 @@ testFramework::testFramework(std::string testName)
     this->testName = testName;
 
     simResultFilename = "simResult_" + testName + ".txt";
-    expectedResultFilename = "expected_" + testName + ".txt";
+    expectedResultFilename = "testResources/expected/expected_" + testName + ".txt";
 }
 
 testFramework::~testFramework()
@@ -33,7 +33,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = "./riscvSim " + testName + ".mem > " + simResultFilename;
+    std::string cmd = "./riscvSim testResources/memImages/" + testName + ".mem > " + simResultFilename;
     system(cmd.c_str());
     parseResult();
     return pass;
@@ -55,7 +55,7 @@ void testFramework::parseResult()
     }
     if (!expectedResult) 
     {
-        std::cerr << "Error opening b.text\n";
+        std::cerr << "Error opening expectedResult\n";
         assert(false);
     }
 
