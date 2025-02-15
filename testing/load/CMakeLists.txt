@@ -5,6 +5,7 @@ add_executable(${PROJECT_NAME} loadTest.cpp)
 target_compile_options(${PROJECT_NAME} PRIVATE -c -g -std=c++17 -Wall -W -Werror -pedantic)
 # Link the executable with the testFramework library
 target_link_libraries(${PROJECT_NAME}  testFramework gtest gtest_main pthread)
+set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
