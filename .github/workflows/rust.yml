@@ -1,0 +1,42 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+    container: archlinux:latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v2
+    - uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: "Dockerfile"
+        tags: testrunner:latest
+        load: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        push: false
+    - name: Build
+      uses: addnab/docker-run-action@v3
+      with:
+        image: testrunner:latest
+        options: -v ${{ github.workspace }}:/mount
+        run: cargo build --manifest-path=/mount/Cargo.toml --verbose
+    - name: Run unit tests
+      uses: addnab/docker-run-action@v3
+      with:
+        image: username/container:latest
+        options: -v ${{ github.workspace }}:/mount
+        run: cargo test --manifest-path=/mount/Cargo.toml --verbose
+
