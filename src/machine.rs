@@ -35,9 +35,9 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"PC: {:#x}", self.pc).unwrap();
+        write!(buf,"\rPC: {:#x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\rX{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
+            write!(buf,"\n\r{1:?}: {0} {0:#x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
@@ -58,7 +58,7 @@ impl Machine {
     // These 4 functions could probably be more modular ...
     pub fn read_instruction_bytes(&self, addr: u32) -> Result<&[u8], ExecutionError> {
         // Error out if the address is not aligned on a 32-bit boundary
-        if addr & 0x11 != 0 {
+        if addr & 0b11 != 0 {
             Err(ExecutionError::InstructionAddressMisaligned(addr))
         // If the memory top is zero then assume we are using the full 4GB address space as memory
         } else if self.memory_top == 0 || addr.overflowing_add(4).0 <= self.memory_top {
