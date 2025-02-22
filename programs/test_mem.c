@@ -10,7 +10,7 @@ int main() {
     for (i=0; i<3; i++) {
         j = multiplicands[i];
         multiplied=0;
-        for (;j>=0; j--) {
+        for (;j>0; j--) {
             multiplied += nums[i];
         }
         result[i] = multiplied;

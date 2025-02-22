@@ -64,7 +64,7 @@ main:
 	sw	a5,-24(s0)
 .L3:
 	lw	a5,-24(s0)
-	bge	a5,zero,.L4
+	bgt	a5,zero,.L4
 	la	a4,result
 	lw	a5,-20(s0)
 	slli	a5,a5,2

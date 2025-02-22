@@ -50,8 +50,18 @@ impl Machine {
                 };
                 write!(buf,"\t\t\t{}",display_me).unwrap();
                 if i == 8 {
-                    write!(buf,"   <- PC").unwrap();
+                    write!(buf,"\t<- PC").unwrap();
                 }
+            } else if i > 16 {
+                // Offset to fetch
+                let context = (i-17)*4;
+                let to_fetch = self.registers[Register::SP].saturating_add(context as u32);
+                let display_me = match self.read_word(to_fetch) {
+                    Ok(word) =>  format!("{0:#010x}",word),
+                    Err(e) => format!("{}",e)
+                };
+                write!(buf,"\t\t\t{}",display_me).unwrap();
+                
             }
         }
         // TODO: Print a little bit of memory context, around where the stack is

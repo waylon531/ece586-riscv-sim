@@ -126,11 +126,16 @@ fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(),ReadFileError> {
         let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
         // TODO: can have byte and word strings
         // look for number of characters
+        let len = data.len();
         let data = u32::from_str_radix(data.trim(), 16)?;
         bytes[addr] = data as u8;
-        bytes[addr + 1 as usize] = (data >> 8) as u8;
-        bytes[addr + 2 as usize] = (data >> 16) as u8;
-        bytes[addr + 3 as usize] = (data >> 24) as u8;
+        if len >= 4 {
+            bytes[addr + 1 as usize] = (data >> 8) as u8;
+        }
+        if len >= 8 {
+            bytes[addr + 2 as usize] = (data >> 16) as u8;
+            bytes[addr + 3 as usize] = (data >> 24) as u8;
+        }
 
 
     }
