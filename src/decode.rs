@@ -93,7 +93,7 @@ impl InstructionType {
                 rs2: Register::from_num(bitrange(combined, 20, 24))
                     .ok_or(ParseError::RegisterDecode(bitrange(combined, 20, 24)))?,
                     // NOTE: shl here as the immediate needs to get multiplied by 2
-                imm: bitrange(combined, 8, 11) << 1
+                imm: (bitrange(combined, 8, 11) << 1)
                     + (bitrange(combined, 25, 30) << 5)
                     + (bitrange(combined, 7, 7) << 11)
                     + (bitrange(combined, 31, 31) << 12),
@@ -111,7 +111,7 @@ impl InstructionType {
             0b1101111 => Ok(InstructionType::JType {
                 rd: Register::from_num(bitrange(combined, 7, 11))
                     .ok_or(ParseError::RegisterDecode(bitrange(combined, 7, 11)))?,
-                imm: bitrange(combined, 21, 30) << 1
+                imm: (bitrange(combined, 21, 30) << 1)
                     + (bitrange(combined, 20, 20) << 11)
                     + (bitrange(combined, 12, 19) << 12)
                     + (bitrange(combined, 31, 31) << 20),

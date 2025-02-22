@@ -35,13 +35,28 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"\rPC: {:#x}", self.pc).unwrap();
+        write!(buf,"\rPC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\r{1:?}: {0} {0:#x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            if i < 16 {
+                let context: i32 = (i as i32-8)*4;
+                let to_fetch = self.pc.saturating_add_signed(context);
+                let display_me = match self.read_instruction_bytes(to_fetch) {
+                    Ok(bytes) => match Operation::from_bytes(bytes) {
+                        Ok(op) => format!("{:?}",op),
+                        Err(e) => format!("{}",e)
+                    },
+                    Err(e) => format!("{}",e)
+                };
+                write!(buf,"\t\t\t{}",display_me).unwrap();
+                if i == 8 {
+                    write!(buf,"   <- PC").unwrap();
+                }
+            }
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-
+        write!(buf,"\r\n").unwrap();
         buf
 
     }

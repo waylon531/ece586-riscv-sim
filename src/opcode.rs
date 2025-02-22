@@ -212,8 +212,8 @@ impl Operation {
             Ok(UType { rd, imm, opcode }) => {
                 let imm_s: Immediate = sign_extend(imm, 20);
                 match opcode {
-                    0b0110111 => LUI(rd, imm_s),
-                    0b0010111 => AUIPC(rd, imm_s),
+                    0b0110111 => LUI(rd, imm_s << 12),
+                    0b0010111 => AUIPC(rd, imm_s << 12),
                     _ => return Err(ParseError::InvalidInstruction(combined)),
                 }
             }
