@@ -35,7 +35,7 @@ jobs:
     - name: Run unit tests
       uses: addnab/docker-run-action@v3
       with:
-        image: username/container:latest
+        image: testrunner:latest
         options: -v ${{ github.workspace }}:/mount
         run: cargo test --manifest-path=/mount/Cargo.toml --verbose
 
