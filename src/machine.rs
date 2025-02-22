@@ -35,13 +35,38 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"PC: {:#x}", self.pc).unwrap();
+        write!(buf,"\rPC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\rX{1}: {0} {0:#x}",self.registers[i],i+1).unwrap();
+            write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            if i < 16 {
+                let context: i32 = (i as i32-8)*4;
+                let to_fetch = self.pc.saturating_add_signed(context);
+                let display_me = match self.read_instruction_bytes(to_fetch) {
+                    Ok(bytes) => match Operation::from_bytes(bytes) {
+                        Ok(op) => format!("{:?}",op),
+                        Err(e) => format!("{}",e)
+                    },
+                    Err(e) => format!("{}",e)
+                };
+                write!(buf,"\t\t\t{}",display_me).unwrap();
+                if i == 8 {
+                    write!(buf,"\t<- PC").unwrap();
+                }
+            } else if i > 16 {
+                // Offset to fetch
+                let context = (i-17)*4;
+                let to_fetch = self.registers[Register::SP].saturating_add(context as u32);
+                let display_me = match self.read_word(to_fetch) {
+                    Ok(word) =>  format!("{0:#010x}",word),
+                    Err(e) => format!("{}",e)
+                };
+                write!(buf,"\t\t\t{}",display_me).unwrap();
+                
+            }
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-
+        write!(buf,"\r\n").unwrap();
         buf
 
     }
@@ -58,7 +83,7 @@ impl Machine {
     // These 4 functions could probably be more modular ...
     pub fn read_instruction_bytes(&self, addr: u32) -> Result<&[u8], ExecutionError> {
         // Error out if the address is not aligned on a 32-bit boundary
-        if addr & 0x11 != 0 {
+        if addr & 0b11 != 0 {
             Err(ExecutionError::InstructionAddressMisaligned(addr))
         // If the memory top is zero then assume we are using the full 4GB address space as memory
         } else if self.memory_top == 0 || addr.overflowing_add(4).0 <= self.memory_top {
@@ -208,7 +233,8 @@ impl Machine {
             // Normal, unconditional jumps use x0 as the register
             JAL(rd, imm) => {
                 self.set_reg(rd, self.pc.overflowing_add(4).0);
-                self.pc = self.pc.overflowing_add(imm as u32).0;
+                // Set the pc, clearing the last bit
+                self.pc = self.pc.overflowing_add(imm as u32).0 & (! 0x1); 
                 increment_pc = false;
             }
             JALR(rd, rs1, imm) => {
@@ -264,25 +290,25 @@ impl Machine {
             // Loads and stores
             LW(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_word(self.registers[rs1].overflowing_add(imm as u32).0)?,
+                self.read_word(self.registers[rs1].overflowing_add_signed(imm).0)?,
             ),
             // There are two casts here, one to sign extend and one to put it into the correct type
             LH(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add(imm as u32).0)? as i32
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as i32
                     as u32,
             ),
             LHU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add(imm as u32).0)? as u32,
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
             ),
             LB(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add(imm as u32).0)? as i32 as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as i32 as u32,
             ),
             LBU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add(imm as u32).0)? as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
             ),
 
             SW(rs1, rs2, imm) => self.store_word(
@@ -369,7 +395,7 @@ mod tests {
     use proptest::prelude::*;
     proptest! {
         #[test]
-        fn load_store_byte_asm(data: u8, s in 16u32..(1<<12)) {
+        fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
             let mut machine = Machine::new(0, 0, s+4, vec![0; s as usize+4].into_boxed_slice());
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
