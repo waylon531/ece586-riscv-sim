@@ -208,7 +208,8 @@ impl Machine {
             // Normal, unconditional jumps use x0 as the register
             JAL(rd, imm) => {
                 self.set_reg(rd, self.pc.overflowing_add(4).0);
-                self.pc = self.pc.overflowing_add(imm as u32).0;
+                // Set the pc, clearing the last bit
+                self.pc = self.pc.overflowing_add(imm as u32).0 & (! 0x1); 
                 increment_pc = false;
             }
             JALR(rd, rs1, imm) => {
@@ -264,25 +265,25 @@ impl Machine {
             // Loads and stores
             LW(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_word(self.registers[rs1].overflowing_add(imm as u32).0)?,
+                self.read_word(self.registers[rs1].overflowing_add_signed(imm).0)?,
             ),
             // There are two casts here, one to sign extend and one to put it into the correct type
             LH(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add(imm as u32).0)? as i32
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as i32
                     as u32,
             ),
             LHU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add(imm as u32).0)? as u32,
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
             ),
             LB(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add(imm as u32).0)? as i32 as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as i32 as u32,
             ),
             LBU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add(imm as u32).0)? as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
             ),
 
             SW(rs1, rs2, imm) => self.store_word(
@@ -369,7 +370,7 @@ mod tests {
     use proptest::prelude::*;
     proptest! {
         #[test]
-        fn load_store_byte_asm(data: u8, s in 16u32..(1<<12)) {
+        fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
             let mut machine = Machine::new(0, 0, s+4, vec![0; s as usize+4].into_boxed_slice());
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
