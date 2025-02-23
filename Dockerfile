@@ -18,5 +18,6 @@ RUN pacman -U --noconfirm riscv32-gnu-toolchain-elf-bin/riscv32-gnu-toolchain-el
 RUN mkdir /workdir/
 RUN chmod 777 /workdir/
 WORKDIR /workdir/
+ENV HOME=/workdir/
 
 
