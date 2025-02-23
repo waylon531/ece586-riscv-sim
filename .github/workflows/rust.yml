@@ -26,7 +26,7 @@ jobs:
         tags: testrunner:latest
         load: true
         cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-to: type=gha,mode=min
         push: false
     - name: Build
       run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest "cargo build --manifest-path=/mount/Cargo.toml --verbose"
