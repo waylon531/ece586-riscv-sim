@@ -32,12 +32,12 @@ jobs:
       uses: addnab/docker-run-action@v3
       with:
         image: testrunner:latest
-        options: -v ${{ github.workspace }}:/mount -u ${UID}:${GID}
+        options: -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)"
         run: cargo build --manifest-path=/mount/Cargo.toml --verbose
     - name: Run unit tests
       uses: addnab/docker-run-action@v3
       with:
         image: testrunner:latest
-        options: -v ${{ github.workspace }}:/mount -u ${UID}:${GID}
+        options: -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)"
         run: cargo test --manifest-path=/mount/Cargo.toml --verbose
 
