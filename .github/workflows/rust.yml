@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Env
-      run: echo ${{env.UID}}:${{env.GID}}
+      run: echo ${UID}:$GID
     - uses: docker/setup-buildx-action@v2
     - uses: docker/build-push-action@v4
       with:
