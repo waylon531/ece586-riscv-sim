@@ -1,8 +1,7 @@
 FROM archlinux:base-devel
 
 RUN pacman-db-upgrade
-RUN pacman -Syu --noconfirm rustup wget
-RUN rustup default stable
+RUN pacman -Syu --noconfirm rust wget
 
 # NOTE: The AUR has packages for 4 variants of the toolchain, we only need
 #       the unknown-elf variant
@@ -15,7 +14,4 @@ USER build
 RUN cd riscv32-gnu-toolchain-elf-bin; makepkg
 USER root
 RUN pacman -U --noconfirm riscv32-gnu-toolchain-elf-bin/riscv32-gnu-toolchain-elf-bin-2025.01.20-1-x86_64.pkg.tar.zst
-RUN mkdir /workdir/
-RUN chmod 777 /workdir/
-WORKDIR /workdir/
-ENV HOME=/workdir/
+ENV HOME=/mount
