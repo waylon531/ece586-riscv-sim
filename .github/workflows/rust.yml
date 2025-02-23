@@ -29,15 +29,7 @@ jobs:
         cache-to: type=gha,mode=max
         push: false
     - name: Build
-      uses: addnab/docker-run-action@v3
-      with:
-        image: testrunner:latest
-        options: -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)"
-        run: cargo build --manifest-path=/mount/Cargo.toml --verbose
+      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest "cargo build --manifest-path=/mount/Cargo.toml --verbose"
     - name: Run unit tests
-      uses: addnab/docker-run-action@v3
-      with:
-        image: testrunner:latest
-        options: -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)"
-        run: cargo test --manifest-path=/mount/Cargo.toml --verbose
+      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest "cargo test --manifest-path=/mount/Cargo.toml --verbose"
 
