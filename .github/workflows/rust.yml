@@ -19,7 +19,7 @@ jobs:
     - name: Update Container
       run: docker build ${{ github.workspace }}
     - name: Build
-      run: docker run -e HOME="/workdir" -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo build --manifest-path=/mount/Cargo.toml --verbose
+      run: docker run -e HOME="/mount" -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo build --manifest-path=/mount/Cargo.toml --verbose
     - name: Run unit tests
-      run: docker run -e HOME="/workdir" -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo test --manifest-path=/mount/Cargo.toml --verbose
+      run: docker run -e HOME="/mount" -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo test --manifest-path=/mount/Cargo.toml --verbose
 
