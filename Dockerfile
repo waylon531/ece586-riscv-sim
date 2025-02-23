@@ -19,5 +19,3 @@ RUN mkdir /workdir/
 RUN chmod 777 /workdir/
 WORKDIR /workdir/
 ENV HOME=/workdir/
-
-
