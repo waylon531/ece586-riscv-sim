@@ -15,5 +15,8 @@ USER build
 RUN cd riscv32-gnu-toolchain-elf-bin; makepkg
 USER root
 RUN pacman -U --noconfirm riscv32-gnu-toolchain-elf-bin/riscv32-gnu-toolchain-elf-bin-2025.01.20-1-x86_64.pkg.tar.zst
+RUN mkdir /workdir/
+RUN chmod 777 /workdir/
+WORKDIR /workdir/
 
 
