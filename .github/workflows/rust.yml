@@ -16,18 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Env
-      run: echo ${UID}:$GID
-    - uses: docker/setup-buildx-action@v2
-    - uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: "Dockerfile"
-        tags: testrunner:latest
-        load: true
-        cache-from: type=gha
-        cache-to: type=gha,mode=min
-        push: false
+    - name: Update Container
+      run: docker build ${{ github.workspace }}
     - name: Build
       run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest "cargo build --manifest-path=/mount/Cargo.toml --verbose"
     - name: Run unit tests
