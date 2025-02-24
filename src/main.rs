@@ -91,7 +91,7 @@ fn main() -> std::io::Result<ExitCode> {
             match machine.step() {
                 Ok(()) => {},
                 Err(ExecutionError::FinishedExecution(code)) => {
-                    break ExitCode::from(code);
+                    break Ok(ExitCode::from(code));
                 }
                 // If we hit a breakpoint, because we are single-stepping, it is only worth
                 // printing an additional message
@@ -101,7 +101,7 @@ fn main() -> std::io::Result<ExitCode> {
                 // Otherwise all errors are fatal
                 Err(e) => {
                     eprintln!("{}",e);
-                    break ExitCode::from(1);
+                    break Err(ExitCode::from(1));
                 }
             };
             write!(stdout,"{}",termion::clear::All)?;
@@ -113,7 +113,7 @@ fn main() -> std::io::Result<ExitCode> {
             match machine.step() {
                 Ok(()) => {},
                 Err(ExecutionError::FinishedExecution(code)) => {
-                    break ExitCode::from(code);
+                    break Ok(ExitCode::from(code));
                 }
                 // If we hit a breakpoint then pause execution and wait for a keypress
                 Err(e@ ExecutionError::Breakpoint(_)) => {
@@ -125,7 +125,7 @@ fn main() -> std::io::Result<ExitCode> {
                 // Otherwise all errors are fatal
                 Err(e) => {
                     eprintln!("{}",e);
-                    break ExitCode::from(1);
+                    break Err(ExitCode::from(1));
                 }
             }
 
@@ -142,7 +142,14 @@ fn main() -> std::io::Result<ExitCode> {
         file.write_all(bytes.as_bytes())?;
     }
     // Exit
-    Ok(status_code)
+    // Determine whether to throw away the status code or not
+    match (status_code,cli.suppress_status) {
+        (Ok(_),true) => Ok(ExitCode::SUCCESS),
+        (Err(_),true) => Ok(ExitCode::FAILURE),
+        (Ok(s),false) => Ok(s),
+        (Err(s),false) => Ok(s),
+
+    }
 }
 
 // Read a single keypress
