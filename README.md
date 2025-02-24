@@ -44,6 +44,9 @@ Options:
   -a, --starting-addr <STARTING_ADDR>  [default: 0]
   -s, --stack-addr <STACK_ADDR>        [default: 65536]
   -m, --memory-top <MEMORY_TOP>        [default: 65536]
+  -d, --dump-to <DUMP_TO>              Dump machine state to filename DUMP_TO when finished
+      --dump-fmt <DUMP_FMT>            [default: txt] [possible values: json, txt]
+      --suppress-status                Suppress exit code returned from emulated program
   -h, --help                           Print help
   -V, --version                        Print version
 ```
