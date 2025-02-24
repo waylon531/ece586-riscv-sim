@@ -1,3 +1,4 @@
+.global main
 main:
     li t1,0xDEADBEEF
     sw t1, 0x100(zero)

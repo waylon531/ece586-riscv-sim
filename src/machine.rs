@@ -2,10 +2,12 @@ use crate::decode::ParseError;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use serde::Serialize;
 use std::fmt::Write;
 
 use thiserror::Error;
 
+#[derive(Serialize)]
 pub struct Machine {
     // Maybe this should be on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
@@ -13,6 +15,7 @@ pub struct Machine {
     //
     // NOTE: This is a boxed slice, while it could well be a Vec for simplicity
     // we also really don't want to have someone resizing the mmap
+    #[serde(skip_serializing)]
     memory: Box<[u8]>,
     // The top of memory, points right above the last usable address
     memory_top: u32,
@@ -68,6 +71,17 @@ impl Machine {
         // And some instruction context as well
         write!(buf,"\r\n").unwrap();
         buf
+
+    }
+    /// Dump the state of the machine in a simple txt format.
+    /// Entries are seperated by newlines, and individual entries all have a : seperator
+    pub fn dump_state_txt(&self) -> String {
+        let mut bytes = String::new();
+        write!(bytes,"PC:{:#010x}\n",self.pc).unwrap();
+        for i in 0 .. 31 { 
+            write!(bytes,"{1:?}:{0:#010x}\n",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+        }
+        bytes
 
     }
     pub fn set_reg(&mut self,reg: Register, value: u32) {
