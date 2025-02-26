@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Update Container
+      run: docker build -t testrunner ${{ github.workspace }}
+    - name: Build
+      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo build --manifest-path=/mount/Cargo.toml --verbose
+    - name: Run unit tests
+      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo test --manifest-path=/mount/Cargo.toml --verbose
+
