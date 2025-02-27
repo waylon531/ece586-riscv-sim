@@ -5,17 +5,23 @@
 #include <cassert>
 #include "testFramework.h"
 
-//cmake -S . -B build
-//cmake --build build
+// pre-req is cmake installed. Simple sudo apt install cmake should work
+// in testing dir
+// cmake -S . -B build
+// cmake --build build
+// go to load directory
+// ./loadTest
+// executes entire test suite
 
 testFramework::testFramework()
 {
 
 }
 
-testFramework::testFramework(std::string testName)
+testFramework::testFramework(std::string testName, std::string instrType)
 {
     this->testName = testName;
+    m_instrType = instrType;
 
     simResultFilename = "simResult_" + testName + ".txt";
     expectedResultFilename = "testResources/expected/expected_" + testName + ".txt";
@@ -33,7 +39,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = "~/ece586-riscv-sim/riscvSim testResources/memImages/" + testName + ".mem 0 65536 > " + simResultFilename;
+    std::string cmd = "~/ece586-riscv-sim/target/release/ece586-riscv-sim ~/ece586-riscv-sim/testResources/memImages/" + testName + ".mem" + "--dump-to ~/ece586-riscv-sim/testing/" + m_instrType +"/"+ simResultFilename;
     system(cmd.c_str());
     parseResult();
     return pass;

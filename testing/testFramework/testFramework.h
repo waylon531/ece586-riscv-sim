@@ -4,7 +4,7 @@ class testFramework
 {
     public:
         testFramework();
-        testFramework(std::string testName);
+        testFramework(std::string testName, std::string instrType);
         ~testFramework();
 
         bool run();
@@ -19,4 +19,5 @@ class testFramework
 
         std::string simResultFilename;
         std::string expectedResultFilename;
+        std::string m_instrType;
 };
