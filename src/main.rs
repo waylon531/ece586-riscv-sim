@@ -2,6 +2,7 @@ mod decode;
 mod machine;
 mod opcode;
 mod register;
+mod webui;
 
 use machine::{Machine,ExecutionError};
 
@@ -14,6 +15,7 @@ use std::fs::File;
 use std::io::{stdin, stdout, Write, Stdin, BufReader, BufRead};
 use std::num;
 use std::process::ExitCode;
+use std::thread;
 
 #[derive(ValueEnum, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
@@ -38,6 +40,8 @@ struct Cli {
     stack_addr: u32,
     #[arg(short = 'm', long, default_value_t = 64*1024)]
     memory_top: u32,
+    #[arg(short = 'W')]
+    web_ui: bool,
 
     /// Dump machine state to filename DUMP_TO when finished
     #[arg(short,long)]
@@ -54,7 +58,25 @@ struct Cli {
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
+    // if we're not running the web ui
+    if !cli.web_ui {
+        // just launch into the simulator
+        return run_simulator(cli);
+    }
+    // otherwise, run simulator and web server in separate threads
+    let simulator_thread = thread::spawn(|| {
+        run_simulator(cli);
+    });
+    let web_server_thread = thread::spawn(|| {
+        webui::run_server();
+    });
+    web_server_thread.join().unwrap();
+    simulator_thread.join().unwrap();
+    // TODO: replace this with exit code of simulator
+    return Ok(ExitCode::from(0));
+}
 
+fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
 
     // Set up input and output
     let stdin = stdin();
