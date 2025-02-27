@@ -8,7 +8,7 @@ type Immediate = i32;
 
 // sign-extend imm field and convert to i32
 pub fn sign_extend(num: u32, bits: u8) -> Immediate {
-    let shamt: u8 = 31 - bits;
+    let shamt: u8 = 32 - bits;
     let res: Immediate = ((num as i32) << shamt) >> shamt;
     res
 }
@@ -212,13 +212,15 @@ impl Operation {
             Ok(UType { rd, imm, opcode }) => {
                 let imm_s: Immediate = sign_extend(imm, 20);
                 match opcode {
-                    0b0110111 => LUI(rd, imm_s),
-                    0b0010111 => AUIPC(rd, imm_s),
+                    0b0110111 => LUI(rd, imm_s << 12),
+                    0b0010111 => AUIPC(rd, imm_s << 12),
                     _ => return Err(ParseError::InvalidInstruction(combined)),
                 }
             }
             Ok(JType { rd, imm, opcode }) => {
-                let imm_s: Immediate = sign_extend(imm, 12);
+                // NOTE: The immediate is shifted over by one here and doubled, 
+                //       so the 20 bit immediate has its MSB at the 21st position
+                let imm_s: Immediate = sign_extend(imm, 21);
                 match opcode {
                     0b1101111 => JAL(rd, imm_s),
                     _ => return Err(ParseError::InvalidInstruction(combined)),
@@ -227,5 +229,21 @@ impl Operation {
             // Bubble the error from opcode parsing up
             Err(e) => return Err(e),
         })
+    }
+}
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn sign_extend_test() {
+        assert_eq!(sign_extend(0xFF,8),-1);
+    }
+
+    #[test]
+    fn no_sign_extend_test() {
+        assert_eq!(sign_extend(0x7F,8),0x7F);
+
     }
 }
