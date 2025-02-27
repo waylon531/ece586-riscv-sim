@@ -4,15 +4,15 @@ mod opcode;
 mod register;
 mod webui;
 
-use machine::{Machine,ExecutionError};
+use machine::{ExecutionError, Machine};
 
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use thiserror::Error;
 
-use clap::{ValueEnum,Parser};
+use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{stdin, stdout, Write, Stdin, BufReader, BufRead};
+use std::io::{stdin, stdout, BufRead, BufReader, Stdin, Write};
 use std::num;
 use std::process::ExitCode;
 use std::thread;
@@ -21,7 +21,7 @@ use std::thread;
 #[clap(rename_all = "kebab_case")]
 enum DumpFmt {
     JSON,
-    Txt
+    Txt,
 }
 
 // TODO: memory top maybe could be a string? For 1GB? Etc
@@ -44,7 +44,7 @@ struct Cli {
     web_ui: bool,
 
     /// Dump machine state to filename DUMP_TO when finished
-    #[arg(short,long)]
+    #[arg(short, long)]
     dump_to: Option<String>,
 
     #[arg(long, value_enum, default_value_t = DumpFmt::Txt)]
@@ -53,7 +53,6 @@ struct Cli {
     /// Suppress exit code returned from emulated program
     #[arg(long)]
     suppress_status: bool,
-
 }
 
 fn main() -> std::io::Result<ExitCode> {
@@ -65,7 +64,10 @@ fn main() -> std::io::Result<ExitCode> {
     }
     // otherwise, run simulator and web server in separate threads
     let simulator_thread = thread::spawn(|| {
-        run_simulator(cli);
+        let cli_for_simulator = cli; // Move cli into a new variable
+        let simulator_thread = thread::spawn(move || {
+            run_simulator(cli_for_simulator).unwrap();
+        });
     });
     let web_server_thread = thread::spawn(|| {
         webui::run_server();
@@ -77,33 +79,41 @@ fn main() -> std::io::Result<ExitCode> {
 }
 
 fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
-
     // Set up input and output
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
-    
-    let capacity = if cli.memory_top == 0 { 4*1024*1024*1024 } else { cli.memory_top  as usize} ;
-    
+
+    let capacity = if cli.memory_top == 0 {
+        4 * 1024 * 1024 * 1024
+    } else {
+        cli.memory_top as usize
+    };
+
     // Check to make sure we can open dump_to and overwrite it
     // In case of a crash this file will then be empty
     let dump_to = match cli.dump_to {
         Some(f) => Some(File::create(f)?),
-        None => None
+        None => None,
     };
 
     let mut mmap = vec![0; capacity];
 
     // TODO: set up machine mmap in a real way instead of this jank
     match parse_file(&mut mmap, &cli.filename) {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(ReadFileError::IoError(e)) => return Err(e),
         Err(e) => {
-            eprintln!("{}",e);
-            return Ok(ExitCode::FAILURE)
+            eprintln!("{}", e);
+            return Ok(ExitCode::FAILURE);
         }
     }
 
-    let mut machine = Machine::new(cli.starting_addr, cli.stack_addr, cli.memory_top, mmap.into_boxed_slice());
+    let mut machine = Machine::new(
+        cli.starting_addr,
+        cli.stack_addr,
+        cli.memory_top,
+        mmap.into_boxed_slice(),
+    );
 
     // Either run the machine in single-step mode or all at once
     // maybe TODO: Move this out to another function so we can do better error handling
@@ -111,48 +121,46 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     let status_code = if cli.single_step {
         loop {
             match machine.step() {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(ExecutionError::FinishedExecution(code)) => {
                     break Ok(ExitCode::from(code));
                 }
                 // If we hit a breakpoint, because we are single-stepping, it is only worth
                 // printing an additional message
-                Err(e@ ExecutionError::Breakpoint(_)) => {
-                    write!(stdout,"{}",e)?;
-                },
+                Err(e @ ExecutionError::Breakpoint(_)) => {
+                    write!(stdout, "{}", e)?;
+                }
                 // Otherwise all errors are fatal
                 Err(e) => {
-                    eprintln!("{}",e);
+                    eprintln!("{}", e);
                     break Err(ExitCode::from(1));
                 }
             };
-            write!(stdout,"{}",termion::clear::All)?;
-            write!(stdout,"{}",machine.display_info())?;
+            write!(stdout, "{}", termion::clear::All)?;
+            write!(stdout, "{}", machine.display_info())?;
             wait_for_keypress(&stdin);
         }
     } else {
         loop {
             match machine.step() {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(ExecutionError::FinishedExecution(code)) => {
                     break Ok(ExitCode::from(code));
                 }
                 // If we hit a breakpoint then pause execution and wait for a keypress
-                Err(e@ ExecutionError::Breakpoint(_)) => {
-                    write!(stdout,"{}",termion::clear::All)?;
-                    write!(stdout,"{}",machine.display_info())?;
-                    write!(stdout,"\n{}",e)?;
+                Err(e @ ExecutionError::Breakpoint(_)) => {
+                    write!(stdout, "{}", termion::clear::All)?;
+                    write!(stdout, "{}", machine.display_info())?;
+                    write!(stdout, "\n{}", e)?;
                     wait_for_keypress(&stdin);
-                },
+                }
                 // Otherwise all errors are fatal
                 Err(e) => {
-                    eprintln!("{}",e);
+                    eprintln!("{}", e);
                     break Err(ExitCode::from(1));
                 }
             }
-
         }
-
     };
     // Handle all cleanup/finishing actions
     if let Some(mut file) = dump_to {
@@ -165,28 +173,28 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     }
     // Exit
     // Determine whether to throw away the status code or not
-    match (status_code,cli.suppress_status) {
-        (Ok(_),true) => Ok(ExitCode::SUCCESS),
-        (Err(_),true) => Ok(ExitCode::FAILURE),
-        (Ok(s),false) => Ok(s),
-        (Err(s),false) => Ok(s),
-
+    match (status_code, cli.suppress_status) {
+        (Ok(_), true) => Ok(ExitCode::SUCCESS),
+        (Err(_), true) => Ok(ExitCode::FAILURE),
+        (Ok(s), false) => Ok(s),
+        (Err(s), false) => Ok(s),
     }
 }
 
 // Read a single keypress
 // NOTE: throws away errors silently
-fn wait_for_keypress<>(stdin: &Stdin) {
+fn wait_for_keypress(stdin: &Stdin) {
     let _ = stdin.lock().keys().next();
 }
 
-fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(),ReadFileError> {
+fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(), ReadFileError> {
     let f = File::open(filename)?;
     let reader = BufReader::new(f);
     for line in reader.lines() {
-    
         let line = line?;
-        let (addr, data) = (&line).split_once(":").ok_or(ReadFileError::ParseError(line.clone()))?;
+        let (addr, data) = (&line)
+            .split_once(":")
+            .ok_or(ReadFileError::ParseError(line.clone()))?;
         let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
         // TODO: can have byte and word strings
         // look for number of characters
@@ -200,11 +208,8 @@ fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(),ReadFileError> {
             bytes[addr + 2 as usize] = (data >> 16) as u8;
             bytes[addr + 3 as usize] = (data >> 24) as u8;
         }
-
-
     }
     Ok(())
-
 }
 
 #[derive(Error, Debug)]
@@ -214,5 +219,5 @@ pub enum ReadFileError {
     #[error("IO ERROR: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Failed to parse number: {0}")]
-    ParseIntError(#[from] num::ParseIntError)
+    ParseIntError(#[from] num::ParseIntError),
 }

@@ -22,10 +22,9 @@ fn get_assets(req: Request) -> Response {
         .body(file.to_vec())
 }
  
-// Example 1: Can return anything that implements Into<Vec<u8>>
 #[get("/api")]
 fn get_api() -> &'static str {
-  "Hello World!"
+    "403"
 }
 
 pub fn run_server() {
