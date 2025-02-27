@@ -39,7 +39,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = "~/ece586-riscv-sim/target/release/ece586-riscv-sim ~/ece586-riscv-sim/testResources/memImages/" + testName + ".mem" + "--dump-to ~/ece586-riscv-sim/testing/" + m_instrType +"/"+ simResultFilename;
+    std::string cmd = "~/ece586-riscv-sim/target/release/ece586-riscv-sim ~/ece586-riscv-sim/testResources/memImages/" + testName + ".mem " + "--dump-to ~/ece586-riscv-sim/testing/" + m_instrType +"/"+ simResultFilename;
     system(cmd.c_str());
     parseResult();
     return pass;
