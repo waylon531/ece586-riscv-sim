@@ -20,11 +20,12 @@ testFramework::testFramework()
 
 testFramework::testFramework(std::string testName, std::string instrType)
 {
-    this->testName = testName;
+    m_testName = testName;
     m_instrType = instrType;
 
-    simResultFilename = "simResult_" + testName + ".txt";
-    expectedResultFilename = "testResources/expected/expected_" + testName + ".txt";
+    m_simResultFilename = "~/ece586-riscv-sim/testing/" + m_instrType + "/simResult_" + m_testName + ".txt";
+    m_expectedResultFilename = "testResources/expected/expected_" + m_testName + ".txt";
+    m_memImageLocation = "~/ece586-riscv-sim/testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
 }
 
 testFramework::~testFramework()
@@ -32,14 +33,14 @@ testFramework::~testFramework()
     if(pass == true)
     {
         // clean up if test passed
-        std::string temp = "rm -rf " + simResultFilename;
+        std::string temp = "rm -rf " + m_simResultFilename;
         system(temp.c_str());
     }
 }
 
 bool testFramework::run()
 {
-    std::string cmd = "~/ece586-riscv-sim/target/release/ece586-riscv-sim ~/ece586-riscv-sim/testResources/memImages/" + testName + ".mem " + "--dump-to ~/ece586-riscv-sim/testing/" + m_instrType +"/"+ simResultFilename;
+    std::string cmd = m_simBinaryLocation + " "+ m_memImageLocation + " --dump-to " + m_simResultFilename;
     system(cmd.c_str());
     parseResult();
     return pass;
@@ -48,18 +49,20 @@ bool testFramework::run()
 void testFramework::parseResult()
 {
     // Open the two files
-    std::ifstream simResult(simResultFilename.c_str(), std::ifstream::in);
-    std::ifstream expectedResult(expectedResultFilename.c_str(), std::ifstream::in);
+    std::ifstream simResult(m_simResultFilename.c_str(), std::ifstream::in);
+    std::ifstream expectedResult(m_expectedResultFilename.c_str(), std::ifstream::in);
     std::string simResultLine;
     std::string expectedResultLine;
 
     // Check if the files were opened successfully
-    if (!simResult) 
+    std::cout<<"simResult: "<<simResult.good()<<std::endl;
+    std::cout<<"expectedResult: "<<expectedResult.good()<<std::endl;
+    if (!simResult.good()) 
     {
         std::cerr << "Error opening simResult\n";
         assert(false);
     }
-    if (!expectedResult) 
+    if (!expectedResult.good()) 
     {
         std::cerr << "Error opening expectedResult\n";
         assert(false);
@@ -76,4 +79,7 @@ void testFramework::parseResult()
             pass = true;
         }
     }
+
+    simResult.close();
+    expectedResult.close();
 }
