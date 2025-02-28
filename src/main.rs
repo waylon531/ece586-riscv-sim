@@ -1,3 +1,4 @@
+mod debugger;
 mod decode;
 mod machine;
 mod opcode;
