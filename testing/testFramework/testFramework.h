@@ -4,7 +4,7 @@ class testFramework
 {
     public:
         testFramework();
-        testFramework(std::string testName, std::string instrType);
+        testFramework(std::string simBinaryLocation, std::string rootPath, std::string testName, std::string instrType);
         ~testFramework();
 
         bool run();
@@ -21,5 +21,6 @@ class testFramework
         std::string m_expectedResultFilename;
         std::string m_instrType;
         std::string m_memImageLocation;
-        const std::string m_simBinaryLocation = "~/ece586-riscv-sim/target/release/ece586-riscv-sim";
+        std::string m_simBinaryLocation;
+        std::string m_rootPath;
 };
