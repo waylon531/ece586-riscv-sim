@@ -28,7 +28,7 @@ testFramework::testFramework(std::string simBinaryLocation, std::string rootPath
     m_simBinaryLocation = simBinaryLocation;
     m_rootPath = rootPath;
 
-    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/simResult_" + m_testName + ".txt";
+    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/testResources/results/simResult_" + m_testName + ".txt";
     m_expectedResultFilename = m_rootPath + "testing/" + m_instrType +"/testResources/expected/expected_" + m_testName + ".txt";
     m_memImageLocation = rootPath + "testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
     m_assemblyFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".s";
@@ -89,6 +89,9 @@ void testFramework::parseResult()
     {
         if(simResultLine != expectedResultLine)
         {
+            pass = false;
+            std::cout<<"Expected results is: "<<expectedResultLine<<std::endl;
+            std::cout<<"Result from sim is: "<<simResultLine<<std::endl;
             break;
         }
         else
