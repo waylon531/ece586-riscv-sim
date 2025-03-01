@@ -27,4 +27,7 @@ class testFramework
         std::string m_rootPath;
         std::string m_assemblerPath;
         std::string m_objdumpPath;
+        std::string m_assemblyFileLocation;
+        std::string m_objFileLocation;
+        std::string m_disassemblyFileLocation;
 };
