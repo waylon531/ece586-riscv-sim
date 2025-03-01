@@ -18,14 +18,16 @@ testFramework::testFramework()
 
 }
 
-testFramework::testFramework(std::string testName, std::string instrType)
+testFramework::testFramework(std::string simBinaryLocation, std::string rootPath, std::string testName, std::string instrType)
 {
     m_testName = testName;
     m_instrType = instrType;
+    m_simBinaryLocation = simBinaryLocation;
+    m_rootPath = rootPath;
 
-    m_simResultFilename = "~/ece586-riscv-sim/testing/" + m_instrType + "/simResult_" + m_testName + ".txt";
-    m_expectedResultFilename = "testResources/expected/expected_" + m_testName + ".txt";
-    m_memImageLocation = "~/ece586-riscv-sim/testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
+    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/simResult_" + m_testName + ".txt";
+    m_expectedResultFilename = m_rootPath + "testing/" + m_instrType +"/testResources/expected/expected_" + m_testName + ".txt";
+    m_memImageLocation = rootPath + "testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
 }
 
 testFramework::~testFramework()
@@ -55,8 +57,6 @@ void testFramework::parseResult()
     std::string expectedResultLine;
 
     // Check if the files were opened successfully
-    std::cout<<"simResult: "<<simResult.good()<<std::endl;
-    std::cout<<"expectedResult: "<<expectedResult.good()<<std::endl;
     if (!simResult.good()) 
     {
         std::cerr << "Error opening simResult\n";
