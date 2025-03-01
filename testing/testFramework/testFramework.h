@@ -14,6 +14,8 @@ class testFramework
          * @brief compare line by line through the simResult and expectedResult
         */
         void parseResult();
+        void generateMemImage();
+        std::string getPath(std::string fileName);
         std::string m_testName;
         bool pass = false;
 
@@ -23,4 +25,6 @@ class testFramework
         std::string m_memImageLocation;
         std::string m_simBinaryLocation;
         std::string m_rootPath;
+        std::string m_assemblerPath;
+        std::string m_objdumpPath;
 };
