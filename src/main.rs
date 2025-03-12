@@ -1,3 +1,4 @@
+mod debugger;
 mod decode;
 mod machine;
 mod opcode;
@@ -6,13 +7,12 @@ mod webui;
 
 use machine::{ExecutionError, Machine};
 
-use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{stdin, stdout, BufRead, BufReader, Stdin, Write};
+use std::io::{stdout, stdin, Write, BufReader, BufRead};
 use std::num;
 use std::process::ExitCode;
 use std::thread;
@@ -36,8 +36,8 @@ struct Cli {
     filename: String,
     #[arg(short = 'a', long, default_value_t = 0)]
     starting_addr: u32,
-    #[arg(short = 's', long, default_value_t = 64*1024)]
-    stack_addr: u32,
+    #[arg(short = 's', long)]
+    stack_addr: Option<u32>,
     #[arg(short = 'm', long, default_value_t = 64*1024)]
     memory_top: u32,
     #[arg(short = 'W')]
@@ -80,8 +80,8 @@ fn main() -> std::io::Result<ExitCode> {
 
 fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     // Set up input and output
-    let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
+    let stdin = stdin();
 
     let capacity = if cli.memory_top == 0 {
         4 * 1024 * 1024 * 1024
@@ -115,62 +115,40 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         mmap.into_boxed_slice(),
     );
 
-    // Either run the machine in single-step mode or all at once
-    // maybe TODO: Move this out to another function so we can do better error handling
-    // it kind of doesnt matter though
-    let status_code = if cli.single_step {
-        loop {
-            match machine.step() {
-                Ok(()) => {}
-                Err(ExecutionError::FinishedExecution(code)) => {
-                    break Ok(ExitCode::from(code));
-                }
-                // If we hit a breakpoint, because we are single-stepping, it is only worth
-                // printing an additional message
-                Err(e @ ExecutionError::Breakpoint(_)) => {
-                    write!(stdout, "{}", e)?;
-                }
-                // Otherwise all errors are fatal
-                Err(e) => {
-                    eprintln!("{}", e);
-                    break Err(ExitCode::from(1));
-                }
-            };
-            write!(stdout, "{}", termion::clear::All)?;
-            write!(stdout, "{}", machine.display_info())?;
-            wait_for_keypress(&stdin);
-        }
-    } else {
-        loop {
-            match machine.step() {
-                Ok(()) => {}
-                Err(ExecutionError::FinishedExecution(code)) => {
-                    break Ok(ExitCode::from(code));
-                }
-                // If we hit a breakpoint then pause execution and wait for a keypress
-                Err(e @ ExecutionError::Breakpoint(_)) => {
-                    write!(stdout, "{}", termion::clear::All)?;
-                    write!(stdout, "{}", machine.display_info())?;
-                    write!(stdout, "\n{}", e)?;
-                    wait_for_keypress(&stdin);
-                }
-                // Otherwise all errors are fatal
-                Err(e) => {
-                    eprintln!("{}", e);
-                    break Err(ExitCode::from(1));
-                }
-            }
+    // Run the machine to completion
+    let result = machine.run(cli.single_step, &stdin, &mut stdout);
+
+    let mut error_message = None;
+
+    let status_code = match result {
+        // This should legitimately be unreachable, Ok(()) is never returned anywhere
+        Ok(()) => unreachable!(),
+        Err(ExecutionError::FinishedExecution(code)) => Ok(ExitCode::from(code)),
+        Err(e) => {
+            error_message = Some(format!("{}",e));
+            Err(ExitCode::from(1))
         }
     };
+
+    // Either run the machine in single-step mode or all at once
     // Handle all cleanup/finishing actions
     if let Some(mut file) = dump_to {
         let bytes = match cli.dump_fmt {
             DumpFmt::JSON => serde_json::to_string(&machine)?,
             DumpFmt::Txt => machine.dump_state_txt(),
         };
-        // Note: this will override the status code spit out by the child program
+        // Note: if this fails it will override the status code spit out by the child program
         file.write_all(bytes.as_bytes())?;
     }
+
+    // Print the registers one last time
+    write!(stdout,"{}",termion::clear::All)?;
+    write!(stdout,"{}",machine.display_info())?;
+
+    if let Some(err) = error_message {
+        write!(stdout,"\r\n{}",err)?;
+    }
+
     // Exit
     // Determine whether to throw away the status code or not
     match (status_code, cli.suppress_status) {
@@ -181,11 +159,6 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     }
 }
 
-// Read a single keypress
-// NOTE: throws away errors silently
-fn wait_for_keypress(stdin: &Stdin) {
-    let _ = stdin.lock().keys().next();
-}
 
 fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(), ReadFileError> {
     let f = File::open(filename)?;
