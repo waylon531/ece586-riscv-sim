@@ -4,10 +4,18 @@ RVLD:=$(RVGCC)
 RVAS:=riscv64-unknown-elf-as
 RVSTRIP:=riscv64-unknown-elf-strip
 CFLAGS:=-fpic -march=rv32i -mabi=ilp32
-LDFLAGS:=$(CFLAGS) -Wl,--gc-sections -Wl,--strip-all
+LIBS:=-lgcc
+LDFLAGS:=$(CFLAGS) -Wl,--gc-sections -nostdlib  -Wl,--strip-all
+TARGETS:=call_subroutine.mem simple_test_mem.mem test_mem.mem
 
-%.elf: %.o lib/libsim.o
-	$(RVLD) $(LDFLAGS) -T linker.ld -o $@ $^
+all: $(TARGETS)
+
+clean: 
+	rm -f $(TARGETS)
+	rm -f lib/libstartup.o
+
+%.elf: %.o lib/libstartup.o
+	$(RVLD) $(LDFLAGS) -T linker.ld -o $@ $^ $(LIBS)
 	$(RVSTRIP) -R .comment -R .riscv.attributes $@
 
 
@@ -19,3 +27,4 @@ LDFLAGS:=$(CFLAGS) -Wl,--gc-sections -Wl,--strip-all
 
 %.o: %.s
 	$(RVAS) $(CFLAGS) -o $@ -c $^ 
+
