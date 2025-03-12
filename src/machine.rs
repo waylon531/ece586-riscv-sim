@@ -7,7 +7,9 @@ use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
 use std::io::{Stdout,Stdin,self};
-use std::sync::{Arc, RwLock};
+
+use single_value_channel::Updater as SvcSender;
+use crossbeam_channel::Receiver as CbReceiver;
 use educe::Educe;
 
 use thiserror::Error;
@@ -53,7 +55,10 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+
+        /* TODO: Check if commands and state channels are present */
+
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
