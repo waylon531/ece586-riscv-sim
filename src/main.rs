@@ -146,11 +146,8 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     write!(stdout,"{}",machine.display_info())?;
 
     if let Some(err) = error_message {
-        write!(stdout,"\r\n{}",err)?;
+        write!(stdout,"\r\n{}\r\n",err)?;
     }
-
-    // Write one last trailing newline for aesthetics
-    write!(stdout, "\r\n")?;
 
     // Exit
     // Determine whether to throw away the status code or not
