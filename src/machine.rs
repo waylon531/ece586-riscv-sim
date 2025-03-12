@@ -46,9 +46,9 @@ impl Machine {
                     pass_breakpoint: false,
                     breakpoints: Vec::new()
         };
-        // Set the stack pointer to the highest valid memory address by default, aligning down to
+        // Set the stack pointer to the lowest invalid memory address by default, aligning down to
         // nearest 16 bytes
-        m.set_reg(Register::SP, stack_addr.unwrap_or((memory_top-4) & !(0xF)));
+        m.set_reg(Register::SP, stack_addr.unwrap_or(memory_top & !(0xF)));
         m
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
