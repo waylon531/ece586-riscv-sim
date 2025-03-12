@@ -1,7 +1,7 @@
 use std::ops::Index;
 use strum::EnumString;
 
-#[derive(PartialEq, Debug, EnumString)]
+#[derive(PartialEq, Debug, EnumString,Clone,Copy)]
 #[strum(ascii_case_insensitive)]
 pub enum Register {
     Zero,

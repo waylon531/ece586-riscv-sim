@@ -1,4 +1,5 @@
 use crate::register::Register;
+use thiserror::Error;
 use std::str::FromStr;
 
 /// This document describes the commands for the debugger built-in to the simulator.
@@ -24,7 +25,7 @@ use std::str::FromStr;
 
 // Maybe should add a string display at some point
 // And/or char display
-#[derive(Default)]
+#[derive(Default,Clone)]
 pub enum DisplayFormat {
     #[default]
     Hex,
@@ -42,6 +43,7 @@ impl DisplayFormat {
     }
 
 }
+#[derive(Clone)]
 pub enum Location {
     /// A register number
     Register(Register),
@@ -65,10 +67,19 @@ impl Location {
         }
     }
 }
+#[derive(Clone)]
 pub enum BreakpointIdentifier {
     Addr(u32),
     Index(usize)
 }
+impl BreakpointIdentifier {
+    pub fn parse(s: &str) -> Result<Self,DebugParseError> {
+
+        unimplemented!()
+    }
+
+}
+#[derive(Clone)]
 pub enum Data {
     Byte(i8),
     Halfword(i16),
@@ -84,14 +95,26 @@ impl Data {
         unimplemented!()
     }
 }
+#[derive(Error,Debug, PartialEq, Eq)]
 pub enum DebugParseError {
+    #[error("Tried to parse empty string")]
     Empty,
+    #[error("Not enough arguments")]
     NotEnoughArguments,
+    #[error("Too many arguments")]
     TooManyArguments,
+    #[error("Invalid command `{0}`")]
     InvalidCommand(String),
+    #[error("Invalid format specifier `{0}`")]
     InvalidFormat(String),
+    #[error("Invalid address or location `{0}`")]
     InvalidLocation(String),
+    #[error("Failed to parse number, found `{0}`")]
+    InvalidNumber(String),
+    #[error("Invalid hex number `{0}`")]
+    InvalidHex(String),
 }
+#[derive(Clone)]
 pub enum DebugCommand {
     PEEK(DisplayFormat,Location),
     WATCH(DisplayFormat,Location),
@@ -139,13 +162,64 @@ impl DebugCommand {
                 DebugCommand::POKE(data,location)
 
             },
+            "step" => {
+                if rest.len() > 1 { return Err(DebugParseError::TooManyArguments) };
+                match rest.pop() {
+                    None => DebugCommand::STEP(1),
+                    Some(num_str) => {
+                        let num = usize::from_str(num_str)
+                                        .map_err(|_| DebugParseError::InvalidNumber(num_str.to_owned()))?;
+                        DebugCommand::STEP(num)
+                    }
+
+                }
+            },
+            "break" => {
+                if rest.len() > 2 { return Err(DebugParseError::TooManyArguments) };
+                let location = rest.pop().ok_or(DebugParseError::NotEnoughArguments)?;
+                let address = location.trim_start_matches("0x").trim_start_matches("0X");
+                DebugCommand::BREAK(
+                        u32::from_str_radix(address,16)
+                        .map_err(|_| DebugParseError::InvalidHex(address.to_string()))?)
+
+            },
+            "rmbrk" => {
+                if rest.len() > 1 { return Err(DebugParseError::TooManyArguments) };
+                let brk = BreakpointIdentifier::parse(rest.pop().ok_or(DebugParseError::NotEnoughArguments)?)?;
+                DebugCommand::RMBRK(brk)
+
+            },
             "help" => DebugCommand::HELP,
             "exit" => DebugCommand::EXIT,
+            "lsbrk" => DebugCommand::LSBRK,
             "run" | "continue" => DebugCommand::CONTINUE,
             c@ _ => return Err(DebugParseError::InvalidCommand(c.to_string()))
 
         };
         Ok(command)
+    }
+    /// Return usage information for the debugger as a list of strings
+    pub fn usage() -> &'static [&'static str] {
+&[
+"PEEK    [format]    <addr/reg>      # Read data at a memory location or from a register",
+"                                    # NOTE:  s0 shows the integer in s0",
+"                                    #       [s0] dereferences s0 and shows memory contents",
+"POKE    <data>      <addr/reg>      # Modify data at a memory location or in a register",
+"WATCH   [format]    <addr/reg>      # Read data every time control is returned",
+"                                    # to the debugger",
+"STEP    [count]                     # Step once, or the given number of times",
+"BREAK   [address]                   # Set a breakpoint at the given address",
+"RMBRK   [address/num]               # Remove a breakpoint at the given address",
+"                                    # or by breakpoint index",
+"LSBRK                               # List out all breakpoints",
+"CONTINUE                            # Return control to the program and run",
+"                                    # until a breakpoint is hit",
+"RUN                                 # Synonym for CONTINUE",
+"EXIT                                # Close the emulator",
+"HELP                                # Show this help message",
+]
+
+
     }
 }
 

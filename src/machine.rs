@@ -1,9 +1,14 @@
+use crate::debugger::{DebugCommand,self,BreakpointIdentifier};
 use crate::decode::ParseError;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
+use std::io::{Stdout,Stdin,self};
+
+use educe::Educe;
 
 use thiserror::Error;
 
@@ -23,17 +28,172 @@ pub struct Machine {
     // x0 is always 0, no reason to store
     registers: [u32; 31],
     pc: u32,
+    // Whether we should step over a breakpoint or not
+    pass_breakpoint: bool,
+    // NOTE: A vec means we linear search through breakpoints, but also gives a map from 
+    //       index/breakpoint number to breakpoint which is nice for ui
+    //
+    //       Might be way slow though to iterate through this every cycle though
+    breakpoints: Vec<u32>
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: u32, memory_top: u32, memmap: Box<[u8]>) -> Self{
+    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
         let mut m = Machine {
                     memory: memmap,
                     registers: [0;31],
                     memory_top,
-                    pc: starting_addr
+                    pc: starting_addr,
+                    pass_breakpoint: false,
+                    breakpoints: Vec::new()
         };
-        m.set_reg(Register::SP, stack_addr);
+        // Set the stack pointer to the highest valid memory address by default, aligning down to
+        // nearest 16 bytes
+        m.set_reg(Register::SP, stack_addr.unwrap_or((memory_top-4) & !(0xF)));
         m
+    }
+    /// Run the machine til completion, either running silently until an error is hit or bringing
+    /// up the debugger after every step
+    pub fn run(&mut self, single_step: bool, stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
+        // NOTE: this cannot be a global include as it conflicts with fmt::Write;
+        use std::io::Write;
+        let mut should_trigger_cmd = single_step;
+        let mut rl = rustyline::DefaultEditor::new()?;
+        // Set the default command to step, by default
+        let mut last_cmd = DebugCommand::STEP(1);
+        let mut should_step = None;
+        // Status messages to print
+        let mut status: Vec<String> = Vec::new();
+        loop {
+
+            // Check if we stepping for N times, and if we are at the end then pull the debugger
+            // back up
+            // Otherwise decrement the step counter
+            if let Some(count) = should_step {
+                if count <= 1 {
+                    should_trigger_cmd = true;
+                    should_step = None;
+                } else {
+                    should_step = Some(count-1);
+                }
+            };
+
+            if should_trigger_cmd {
+                // print debug state
+                write!(stdout,"{}",termion::clear::All)?;
+                write!(stdout,"{}",self.display_info())?;
+
+                write!(stdout,"\r\n")?;
+
+                // print status lines
+                for line in status.drain(..) {
+                    write!(stdout,"{}\r\n",line)?;
+                }
+
+                write!(stdout,"\r\n")?;
+
+                // read prompt
+                let readline = rl.readline(">> ");
+                let read_value = match readline {
+                    Ok(line) => line,
+                    // Ctrl-C
+                    Err(ReadlineError::Interrupted) => {
+                        return Err(ExecutionError::HaltedByUser)
+                    },
+                    // Ctrl-D
+                    Err(ReadlineError::Eof) => {
+                        return Err(ExecutionError::HaltedByUser)
+                    },
+                    // If readline throws any other error then bail with the corresponding error
+                    // captured
+                    Err(e) => return Err(e)?
+                };
+                // parse and handle debug command
+                let command = match read_value.as_str() {
+                    "" => last_cmd.clone(),
+                    read_value => match DebugCommand::from_string(read_value) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            status.push(format!("{}",e));
+                            continue
+                        }
+                    }
+                };
+
+
+                match command {
+                    DebugCommand::EXIT => return Err(ExecutionError::HaltedByUser),
+                    DebugCommand::HELP => for line in DebugCommand::usage() { status.push(line.to_string()) },
+                    DebugCommand::CONTINUE => {should_trigger_cmd = false;},
+                    DebugCommand::STEP(count) => {
+                        should_trigger_cmd = false;
+                        should_step = Some(count);
+                    },
+                    DebugCommand::BREAK(addr) => {
+                        if !self.breakpoints.contains(&addr) {
+                            self.breakpoints.push(addr)
+                        } else {
+                            status.push(
+                                format!("Unable to insert duplicate breakpoint at {0:#010x}", addr));
+                        }
+                        status.push(format!("Added breakpoint {} at {:#010x}",self.breakpoints.len(),addr));
+                        continue;
+
+                    },
+                    DebugCommand::RMBRK(BreakpointIdentifier::Index(index)) => {
+                        self.breakpoints.remove(index);
+                        status.push(format!("Successfully removed breakpoint {}",index));
+                        continue;
+                    },
+                    DebugCommand::RMBRK(BreakpointIdentifier::Addr(address)) => {
+                        let mut to_remove = None;
+                        for (k,v) in self.breakpoints.iter().enumerate() {
+                            if *v == address {
+                                to_remove = Some(k);
+                                break;
+                            }
+                        }
+                        if let Some(key) = to_remove {
+                            self.breakpoints.remove(key);
+                            status.push(format!("Successfully removed breakpoint {}",key));
+                        } else {
+                            status.push("Unable to find breakpoint".to_string());
+                        };
+                        continue;
+                    },
+                    DebugCommand::LSBRK => {
+                        for (index,address) in self.breakpoints.iter().enumerate() {
+                            status.push(format!("{index}: {address:#010x}"));
+                        }
+                        continue;
+                    },
+
+                    _ => unimplemented!()
+                }
+                // Note: this will only get updated on commands that step or continue
+                //       not 100% sure that's what we want yet
+                last_cmd = command;
+
+            }
+            match self.step() {
+                Ok(()) => {},
+                // Should errors bail? Or bring up the debugger to explore program state?
+                // Bail for now probably, its easier (though worse)
+                Err(e@ ExecutionError::Breakpoint(_)) => {
+                    should_trigger_cmd = true;
+                    // Give a pass so the next step of execution can make it past the breakpoint
+                    self.pass_breakpoint = true;
+                    status.push(format!("{}",e));
+                },
+                Err(e) => return Err(e)
+
+            }
+            // Check if the user is pressing ctrl-c, and if they are, drop back into the debugger
+            // oops this needs a bonus thread, this is going to suck
+            // the thread can get spun up whenever we are running and spun down, or paused, when we
+            // go to the debugger
+            
+        }
+        
     }
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
@@ -43,15 +203,22 @@ impl Machine {
             write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
             if i < 16 {
                 let context: i32 = (i as i32-8)*4;
-                let to_fetch = self.pc.saturating_add_signed(context);
-                let display_me = match self.read_instruction_bytes(to_fetch) {
-                    Ok(bytes) => match Operation::from_bytes(bytes) {
-                        Ok(op) => format!("{:?}",op),
-                        Err(e) => format!("{}",e)
+                let to_fetch = self.pc.overflowing_add_signed(context);
+                match to_fetch {
+                    (addr, false) => {
+                        let display_me = match self.read_instruction_bytes(addr) {
+                            Ok(bytes) => match Operation::from_bytes(bytes) {
+                                Ok(op) => format!("{:?}",op),
+                                Err(e) => format!("{}",e)
+                            },
+                            Err(e) => format!("{}",e)
+                        };
+                        write!(buf,"\t\t{addr:#010x}: {}",display_me).unwrap();
                     },
-                    Err(e) => format!("{}",e)
+                    (_num, true) => {
+
+                    }
                 };
-                write!(buf,"\t\t\t{}",display_me).unwrap();
                 if i == 8 {
                     write!(buf,"\t<- PC").unwrap();
                 }
@@ -63,7 +230,7 @@ impl Machine {
                     Ok(word) =>  format!("{0:#010x}",word),
                     Err(e) => format!("{}",e)
                 };
-                write!(buf,"\t\t\t{}",display_me).unwrap();
+                write!(buf,"\t\t{to_fetch:#010x}: {}",display_me).unwrap();
                 
             }
         }
@@ -166,6 +333,14 @@ impl Machine {
     // Fetch, decode, and execute an instruction
     pub fn step(&mut self) -> Result<(), ExecutionError> {
         use Operation::*;
+        // First, check if we're at a breakpoint, and cannot pass over it
+        if self.breakpoints.contains(&self.pc) && !self.pass_breakpoint {
+            return Err(ExecutionError::Breakpoint(self.pc));
+        } else {
+            // Unset breakpoint pass
+            self.pass_breakpoint = false;
+
+        }
         //Fetch and decode
         let op = Operation::from_bytes(self.read_instruction_bytes(self.pc)?)?;
 
@@ -360,7 +535,12 @@ impl Machine {
     }
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, Educe)]
+// Educe is needed here as some nested error types are not comparable. Comparison is very important
+// here for matching and for tests in general, so we skip checking the uncomparable inner fields
+// of the relevant error types. This means every IOError is equal to every other IOError, no matter
+// the contents of the inner error.
+#[educe(PartialEq)]
 pub enum ExecutionError {
     #[error("Failed to decode instruction: {0}")]
     ParseError(#[from] ParseError),
@@ -376,6 +556,14 @@ pub enum ExecutionError {
     // maybe could be represented a different way but this is easy
     #[error("Successfully finished execution")]
     FinishedExecution(u8),
+    #[error("Execution halted by user")]
+    HaltedByUser,
+    #[error("IO error encountered while running VM: {0}")]
+    IOError(#[educe(PartialEq(ignore))] #[from] io::Error),
+    #[error("Error while reading line: {0}")]
+    ReadlineError(#[educe(PartialEq(ignore))] #[from] ReadlineError),
+    #[error("Error while parsing debug command: {0}")]
+    DebugParseError(#[from] debugger::DebugParseError),
 }
 
 #[cfg(test)]
@@ -385,7 +573,7 @@ mod tests {
 
     #[test]
     fn test_write_u32() {
-        let mut machine = Machine::new(0,0,8,vec![0;4].into_boxed_slice());
+        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice());
         machine.store_word(0xBEE5AA11,0).unwrap();
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
@@ -394,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_program_completion() {
-        let mut machine = Machine::new(0, 0, 32, vec![0; 32].into_boxed_slice());
+        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice());
         let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
         let _ = machine.store_word(store_a0_42 as u32,0);
         // JALR to RA
@@ -410,7 +598,7 @@ mod tests {
     proptest! {
         #[test]
         fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
-            let mut machine = Machine::new(0, 0, s+4, vec![0; s as usize+4].into_boxed_slice());
+            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice());
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
             println!("S: {}",s);
