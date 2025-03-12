@@ -149,6 +149,9 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         write!(stdout,"\r\n{}",err)?;
     }
 
+    // Write one last trailing newline for aesthetics
+    write!(stdout, "\r\n")?;
+
     // Exit
     // Determine whether to throw away the status code or not
     match (status_code, cli.suppress_status) {
