@@ -146,7 +146,7 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     write!(stdout,"{}",machine.display_info())?;
 
     if let Some(err) = error_message {
-        write!(stdout,"\r\n{}",err)?;
+        write!(stdout,"\r\n{}\r\n",err)?;
     }
 
     // Exit
