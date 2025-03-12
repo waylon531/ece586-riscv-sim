@@ -1,7 +1,7 @@
 FROM archlinux:base-devel
 
 RUN pacman-db-upgrade
-RUN pacman -Syu --noconfirm rust curl python3 libmpc mpfr gmp base-devel texinfo gperf patchutils bc zlib expat libslirp
+RUN pacman -Syu --noconfirm rust curl python3 libmpc mpfr gmp base-devel texinfo gperf patchutils bc zlib expat libslirp git
 
 # Install the cross compiler with the three potential targets we're simulating
 RUN mkdir /opt/riscv-cross
