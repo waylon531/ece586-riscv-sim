@@ -134,7 +134,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     );
 
     // Run the machine to completion
-    let result = machine.run(cli.single_step, &stdin, &mut stdout);
+    let result = machine.run(cli.single_step, &stdin, &mut stdout, commands_rx,state_tx);
 
     let mut error_message = None;
 
