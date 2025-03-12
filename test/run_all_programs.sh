@@ -2,11 +2,11 @@
 
 FAILURES=0
 
-for program in progams/*.mem; do
+for program in programs/*.mem; do
     echo "--------------------"
     echo "Running $program"
     cargo run -- --suppress-status "$program"
-    FAILURE=$((FAILURE + $?))
+    FAILURES=$((FAILURES + $?))
     echo "--------------------"
 done
 
