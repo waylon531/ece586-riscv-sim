@@ -1,10 +1,15 @@
 use std::net::TcpListener;
-use tinyhttp::{internal::request, prelude::*};
-use std::{env, io};
+use tinyhttp::prelude::*;
+use std::env;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::fs;
+use crossbeam_channel::Sender as CbSender;
+use single_value_channel::Receiver as SvcReceiver;
+use std::sync::{LazyLock,Mutex};
 
+static COMMANDS_TX: LazyLock<Mutex<Option<CbSender<i32>>>> = LazyLock::new(|| Mutex::new(None));
+static STATE_RX: LazyLock<Mutex<Option<SvcReceiver<i32>>>> = LazyLock::new(|| Mutex::new(None));
 
 
 // serve the static resources for the web ui
@@ -28,7 +33,8 @@ fn get_assets(req: Request) -> Response {
         .mime(mime_type)
         .body(file.to_vec())
 }
- 
+
+
 #[post("/api/compile")]
 fn post_compile(code: Option<&str>) -> Response {
     build_riscv(code, "RVGCC")
@@ -88,8 +94,18 @@ fn build_riscv(code: Option<&str>, lang: &str) -> Response {
         .body(response_message)
 }
 
+// Helper functions to use the channels without this ungodly mess
+fn send_commands() {
+    let commands_tx = COMMANDS_TX.lock().unwrap().as_ref().unwrap().clone();
+}
+fn receive_state() {
+    let state_rx = STATE_RX.lock().unwrap().as_ref().unwrap().clone();
+}
 
-pub fn run_server() {
+
+pub fn run_server(commands_tx: CbSender<i32>, state_rx: SvcReceiver<i32>) {
+    *COMMANDS_TX.lock().unwrap() = Some(commands_tx);
+    *STATE_RX.lock().unwrap() = Some(state_rx);
 
     let socket = TcpListener::bind(":::9001").unwrap();
     let routes = Routes::new(vec![get_assets(), post_compile(), post_assemble()]);
@@ -99,4 +115,5 @@ pub fn run_server() {
     println!("Web UI is listening on port 9001");
 
     http.start();
+    println!("Started.");
 }

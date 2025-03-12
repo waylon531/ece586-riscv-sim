@@ -7,7 +7,7 @@ use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
 use std::io::{Stdout,Stdin,self};
-
+use std::sync::{Arc, RwLock};
 use educe::Educe;
 
 use thiserror::Error;
@@ -53,7 +53,7 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
@@ -64,7 +64,11 @@ impl Machine {
         // Status messages to print
         let mut status: Vec<String> = Vec::new();
         loop {
-
+            /*
+                At the start of each cycle, if the web server is running, we want to communicate with it.
+                We exchange information - we send the current state of the machine, and we read commands sent from the web interface.
+                Those commands may include modifications to registers or memory addresses - so we interpret those.
+             */
             // Check if we stepping for N times, and if we are at the end then pull the debugger
             // back up
             // Otherwise decrement the step counter
