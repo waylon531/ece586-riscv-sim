@@ -1,17 +1,12 @@
 FROM archlinux:base-devel
 
 RUN pacman-db-upgrade
-RUN pacman -Syu --noconfirm rust wget
+RUN pacman -Syu --noconfirm rust curl python3 libmpc mpfr gmp base-devel texinfo gperf patchutils bc zlib expat libslirp
 
-# NOTE: The AUR has packages for 4 variants of the toolchain, we only need
-#       the unknown-elf variant
-RUN useradd --no-create-home build && usermod -L build
-RUN wget https://aur.archlinux.org/cgit/aur.git/snapshot/riscv32-gnu-toolchain-elf-bin.tar.gz
-RUN tar xvf riscv32-gnu-toolchain-elf-bin.tar.gz
-RUN chown -R build:build riscv32-gnu-toolchain-elf-bin
-# Archlinux does not let you run makepkg as root, so swap to the freshly created user
-USER build
-RUN cd riscv32-gnu-toolchain-elf-bin; makepkg
-USER root
-RUN pacman -U --noconfirm riscv32-gnu-toolchain-elf-bin/riscv32-gnu-toolchain-elf-bin-2025.01.20-1-x86_64.pkg.tar.zst
+# Install the cross compiler with the three potential targets we're simulating
+RUN mkdir /opt/riscv-cross
+RUN git clone https://github.com/riscv-collab/riscv-gnu-toolchain
+RUN cd riscv-gnu-toolchain && ./configure --prefix=/opt/riscv-cross --enable-multilib --with-multilib-generator="rv32i-ilp32--;rv32im-ilp32--;rv32imf-ilp32--" --disable-linux && make 
+
 ENV HOME=/mount
+ENV PATH="/opt/riscv-cross/bin:$PATH"
