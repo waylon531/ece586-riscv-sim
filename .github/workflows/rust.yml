@@ -25,5 +25,5 @@ jobs:
     - name: Compile programs
       run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest make -C /mount/programs
     - name: Test programs
-      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest -w /mount test/run_all_programs.sh
+      run: docker run -v ${{ github.workspace }}:/mount -w /mount -u "$(id -u):$(id -g)" testrunner:latest test/run_all_programs.sh
 
