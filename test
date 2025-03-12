@@ -1,0 +1,14 @@
+.section .text
+.global strlen
+strlen:
+    # a0 = const char *str
+    add  a1, a0, zero   # copy a0
+1: # Start of for loop
+    lb   a2, 0(a0)
+    beq  a2, zero, 1f   # str[i] != 0
+    addi a0, a0, 1      # Add 1 to the memory address
+    jal  zero, 1b       # Jump back to condition (1 backwards)
+1: # End of for loop
+    sub a0, a0, a1      # Calculate return value
+    jalr zero, ra
+
