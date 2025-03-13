@@ -22,4 +22,8 @@ jobs:
       run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo build --manifest-path=/mount/Cargo.toml --verbose
     - name: Run unit tests
       run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest cargo test --manifest-path=/mount/Cargo.toml --verbose
+    - name: Compile programs
+      run: docker run -v ${{ github.workspace }}:/mount -u "$(id -u):$(id -g)" testrunner:latest make -C /mount/programs
+    - name: Test programs
+      run: docker run -t -v ${{ github.workspace }}:/mount -w /mount -u "$(id -u):$(id -g)" testrunner:latest test/run_all_programs.sh
 
