@@ -167,6 +167,11 @@ impl Operation {
                         0b111 => ANDI(rd, rs1, imm_s),
                         _ => return Err(ParseError::InvalidInstruction(combined)),
                     },
+                    0b1110011 => match imm {
+                            1 => EBREAK,
+                            0 => ECALL,
+                            _    => return Err(ParseError::InvalidInstruction(combined))
+                    },
                     _ => return Err(ParseError::InvalidOpcode(opcode)),
                 }
             }
