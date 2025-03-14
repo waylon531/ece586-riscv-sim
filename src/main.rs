@@ -4,6 +4,7 @@ mod machine;
 mod opcode;
 mod register;
 mod webui;
+mod statetransfer;
 
 use machine::{ExecutionError, Machine};
 
@@ -17,7 +18,7 @@ use std::num;
 use std::process::ExitCode;
 use std::thread;
 
-use single_value_channel::{channel_starting_with,Receiver as SvcReceiver, Updater as SvcSender};
+use single_value_channel::{channel_starting_with,Updater as SvcSender};
 use crossbeam_channel::{unbounded,Receiver as CbReceiver, Sender as CbSender};
 
 

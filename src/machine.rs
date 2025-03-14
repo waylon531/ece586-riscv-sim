@@ -5,8 +5,15 @@ use crate::register::Register;
 
 use rustyline::error::ReadlineError;
 use serde::Serialize;
+use core::time;
 use std::fmt::Write;
-use std::io::{Stdout,Stdin,self};
+use std::io::Seek;
+use std::thread::sleep;
+use std::{
+    fs::File,
+    io::{self, Read,Write as ioWrite,Stdout,Stdin},
+    os::unix::io::FromRawFd,
+};
 
 use single_value_channel::Updater as SvcSender;
 use crossbeam_channel::Receiver as CbReceiver;
@@ -14,9 +21,11 @@ use educe::Educe;
 
 use thiserror::Error;
 
+use crate::statetransfer;
+
 #[derive(Serialize)]
 pub struct Machine {
-    // Maybe this should be on the heap
+    // Maybe this should be  on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
     // we can load?
     //
@@ -36,7 +45,8 @@ pub struct Machine {
     //       index/breakpoint number to breakpoint which is nice for ui
     //
     //       Might be way slow though to iterate through this every cycle though
-    breakpoints: Vec<u32>
+    breakpoints: Vec<u32>,
+    timer: u128
 }
 impl Machine {
     pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
@@ -46,7 +56,8 @@ impl Machine {
                     memory_top,
                     pc: starting_addr,
                     pass_breakpoint: false,
-                    breakpoints: Vec::new()
+                    breakpoints: Vec::new(),
+                    timer: 0
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
         // nearest 16 bytes
@@ -56,7 +67,8 @@ impl Machine {
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
     pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
-
+        // reset timer
+        self.timer = 0;
         /* TODO: Check if commands and state channels are present */
 
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
@@ -339,6 +351,8 @@ impl Machine {
     }
     // Fetch, decode, and execute an instruction
     pub fn step(&mut self) -> Result<(), ExecutionError> {
+        // start timer 
+        let t = std::time::Instant::now();
         use Operation::*;
         // First, check if we're at a breakpoint, and cannot pass over it
         if self.breakpoints.contains(&self.pc) && !self.pass_breakpoint {
@@ -523,7 +537,45 @@ impl Machine {
             )?,
 
             // Evironment call/syscall
-            ECALL => {}
+            ECALL => {
+                /* Fun with system calls! I think this is technically a BIOS? */
+                // this should definitely be its own module I feel
+                // a7: syscall, a0-a2: arguments
+                let (a7,a0,a1,a2) = (self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2]);
+                match a7 {
+                    // read from file descriptor
+                    63 => {
+                        let mut f = unsafe { File::from_raw_fd(a0 as i32) };
+                        let mut buf = vec![0;a2 as usize];
+                        match f.read(&mut buf) {
+                            Ok(bytes_read) => { self.set_reg(Register::A0, bytes_read as u32); }
+                            Err(_) => { self.set_reg(Register::A0, (0-1) as u32); }
+                        }
+                    }
+                    // write to file descriptor
+                    64 => {
+                        let mut f = unsafe { File::from_raw_fd(a0 as i32) };
+                        // literally no idea if this will work
+                        match f.write(&self.memory[a1 as usize..(a1+a2) as usize]) {
+                            Ok(bytes_written) => { self.set_reg(Register::A0, bytes_written as u32); },
+                            Err(_) => { self.set_reg(Register::A0, (0-1) as u32); }
+                        }
+                    },
+                    // sleep
+                    77 => {
+                        sleep(time::Duration::from_millis(a0 as u64));
+                    },
+                    // return time elapsed
+                    78 => {
+                        self.set_reg(Register::A0, self.timer as u32);
+                    }
+                    // exit
+                    94 => {
+                        std::process::exit(a0 as i32);
+                    },
+                    _ => return Err(ExecutionError::InvalidSyscall(a7))
+                }
+            }
 
             // Breakpoint for us
             EBREAK => return Err(ExecutionError::Breakpoint(self.pc)),
@@ -540,6 +592,9 @@ impl Machine {
         if increment_pc {
             self.pc = self.pc.overflowing_add(4).0;
         }
+
+        self.timer += t.elapsed().as_millis();
+
         Ok(())
     }
 }
@@ -573,6 +628,8 @@ pub enum ExecutionError {
     ReadlineError(#[educe(PartialEq(ignore))] #[from] ReadlineError),
     #[error("Error while parsing debug command: {0}")]
     DebugParseError(#[from] debugger::DebugParseError),
+    #[error("Invalid system call: {0}")]
+    InvalidSyscall(u32)
 }
 
 #[cfg(test)]

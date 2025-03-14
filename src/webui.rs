@@ -7,6 +7,7 @@ use std::fs;
 use crossbeam_channel::Sender as CbSender;
 use single_value_channel::Receiver as SvcReceiver;
 use std::sync::{LazyLock,Mutex};
+use crate::statetransfer;
 
 static COMMANDS_TX: LazyLock<Mutex<Option<CbSender<i32>>>> = LazyLock::new(|| Mutex::new(None));
 static STATE_RX: LazyLock<Mutex<Option<SvcReceiver<i32>>>> = LazyLock::new(|| Mutex::new(None));
@@ -32,6 +33,29 @@ fn get_assets(req: Request) -> Response {
     .status_line(format!("HTTP/1.1 {} {}\r\n", code, match code { 404 => "Not Found", _ => "OK" }))
         .mime(mime_type)
         .body(file.to_vec())
+}
+
+#[post("/control/:")]
+fn post_run(req: Request) -> Response {
+    let wildcard = req.get_wildcard().unwrap();
+
+    let code = match wildcard.as_str() {
+        "run" => {
+
+            200
+        }
+        "stop" => {
+            200
+        }
+        "step" => {
+            200
+        }
+        _ => {
+            500
+        }
+    };
+    Response::new()
+    .status_line(format!("HTTP/1.1 {} {}\r\n", code, match code { 500 => "Failed to set state", _ => "OK" }))
 }
 
 
@@ -97,9 +121,13 @@ fn build_riscv(code: Option<&str>, lang: &str) -> Response {
 // Helper functions to use the channels without this ungodly mess
 fn send_commands() {
     let commands_tx = COMMANDS_TX.lock().unwrap().as_ref().unwrap().clone();
+    commands_tx.send(12).unwrap();
+
 }
 fn receive_state() {
-    let state_rx = STATE_RX.lock().unwrap().as_ref().unwrap().clone();
+    let mut state_rx_guard = STATE_RX.lock().unwrap(); // Get MutexGuard
+    let state_rx = state_rx_guard.as_mut().unwrap();
+
 }
 
 
