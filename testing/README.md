@@ -18,8 +18,7 @@ To build the tests, at the `testing/` directory run:
 - `$ cmake --build build` to build the tests.
 
 This builds test binaries in each of the following folders
-- `load/`
-- `store/`
+- `loadStore/`
 - `branch/`
 - `integer/`
 - `integerImm/`
