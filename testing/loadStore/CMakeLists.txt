@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23.1)
 
-project(loadTest VERSION 1.0.0  LANGUAGES CXX)
-add_executable(${PROJECT_NAME} loadTest.cpp)
+project(loadStoreTest VERSION 1.0.0  LANGUAGES CXX)
+add_executable(${PROJECT_NAME} loadStoreTest.cpp)
 target_compile_options(${PROJECT_NAME} PRIVATE -c -g -std=c++17 -Wall -W -Werror -pedantic)
 # Link the executable with the testFramework library
 target_link_libraries(${PROJECT_NAME}  testFramework gtest gtest_main pthread)

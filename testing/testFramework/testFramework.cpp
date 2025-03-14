@@ -28,8 +28,8 @@ testFramework::testFramework(std::string simBinaryLocation, std::string rootPath
     m_simBinaryLocation = simBinaryLocation;
     m_rootPath = rootPath;
 
-    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/testResources/results/simResult_" + m_testName + ".txt";
-    m_expectedResultFilename = m_rootPath + "testing/" + m_instrType +"/testResources/expected/expected_" + m_testName + ".txt";
+    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/testResources/results/" + m_testName + ".txt";
+    m_expectedResultFilename = m_rootPath + "testing/" + m_instrType +"/testResources/expected/" + m_testName + ".txt";
     m_memImageLocation = rootPath + "testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
     m_assemblyFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".s";
     m_objFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".out";
@@ -82,6 +82,7 @@ void testFramework::parseResult()
     if (!expectedResult.good()) 
     {
         std::cerr << "Error opening expectedResult\n";
+        std::cerr << "Is the the test result name correctly?\n";
         assert(false);
     }
 
@@ -134,7 +135,8 @@ void testFramework::generateMemImage()
     // This regex matches lines that start with optional whitespace,
     // followed by an address (digits) and a colon,
     // then some whitespace and a hexadecimal value.
-    std::regex pattern("^\\s*(\\d+):\\s+([0-9a-fA-F]+)");
+    std::regex pattern("^\\s*([0-9a-fA-F]+:)\\s+([0-9a-fA-F]{8})");
+    //std::regex pattern("^\\s*(\\d+):\\s+([0-9a-fA-F]+)");
 
     while(std::getline(disassembly, line))
     {
@@ -149,7 +151,7 @@ void testFramework::generateMemImage()
         {
             // match[1] contains the address (e.g., "0" or "4")
             // match[2] contains the hexadecimal code (e.g., "0ff00293")
-            memImage << match[1] << ":   " << match[2] << "\n";
+            memImage << match[1] << "   " << match[2] << "\n";
         }
     }
 }
