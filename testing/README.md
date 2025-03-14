@@ -18,13 +18,9 @@ To build the tests, at the `testing/` directory run:
 - `$ cmake --build build` to build the tests.
 
 This builds test binaries in each of the following folders
-- `loadStore/`
-- `branch/`
-- `integer/`
-- `integerImm/`
-- `jump/`
-- `lui/`
-- `auipc/`
+- `loadStore/` load and store focused tests
+- `branchJump/` branch, jump, auipc, and lui focused tests
+- `integer/` integer register and immediate arithmetic and logic ops focused test
 
 Inside one of those folders will be a binary called `<foldername>Test`, and to
 run the test execute `$ ./<foldername>Test`.

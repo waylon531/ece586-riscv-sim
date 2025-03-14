@@ -1,0 +1,5 @@
+*.out
+assembly/*.out
+assembly/*.dis
+memImages/*
+results/*
