@@ -352,6 +352,8 @@ impl Machine {
     }
     // Fetch, decode, and execute an instruction
     pub fn step(&mut self) -> Result<(), ExecutionError> {
+        // start timer 
+        let t = std::time::Instant::now();
         use Operation::*;
         // First, check if we're at a breakpoint, and cannot pass over it
         if self.breakpoints.contains(&self.pc) && !self.pass_breakpoint {

@@ -5,7 +5,10 @@ mod opcode;
 mod register;
 mod webui;
 mod statetransfer;
+<<<<<<< HEAD
 mod environment;
+=======
+>>>>>>> f59610f (Added ecall functions)
 
 use machine::{ExecutionError, Machine};
 
