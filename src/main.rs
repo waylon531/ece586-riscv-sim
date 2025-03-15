@@ -5,6 +5,7 @@ mod opcode;
 mod register;
 mod webui;
 mod statetransfer;
+mod environment;
 
 use machine::{ExecutionError, Machine};
 
@@ -13,7 +14,7 @@ use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{stdout, stdin, Write, BufReader, BufRead};
+use std::io::{stdout, stdin, Write, BufReader, BufRead, IsTerminal};
 use std::num;
 use std::process::ExitCode;
 use std::thread;
@@ -97,6 +98,7 @@ fn main() -> std::io::Result<ExitCode> {
 
 fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
     // Set up input and output
+    
     let mut stdout = stdout().into_raw_mode().unwrap();
     let stdin = stdin();
 
