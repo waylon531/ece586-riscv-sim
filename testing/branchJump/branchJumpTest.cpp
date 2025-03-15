@@ -4,7 +4,7 @@
 #include "testFramework.h"
 
 const std::string homedir = std::getenv("HOME");
-const std::string simBinaryLocation = "~/ece586-riscv-sim/target/release/ece586-riscv-sim";
+const std::string simBinaryLocation = homedir + "/ece586-riscv-sim/target/release/ece586-riscv-sim";
 const std::string rootPath = homedir + "/ece586-riscv-sim/";
 
 TEST(branchJumpTest, register_add)

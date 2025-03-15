@@ -2,19 +2,11 @@
 #include <fstream>
 #include <cstdlib>
 #include <iostream>
-#include <cassert>
 #include <cstdlib>
 #include <sstream>
 #include <regex>
+#include <cstdlib>
 #include "testFramework.h"
-
-// pre-req is cmake installed. Simple sudo apt install cmake should work
-// in testing dir
-// cmake -S . -B build
-// cmake --build build
-// go to load directory
-// ./loadTest
-// executes entire test suite
 
 testFramework::testFramework()
 {
@@ -77,13 +69,13 @@ void testFramework::parseResult()
     if (!simResult.good()) 
     {
         std::cerr << "Error opening simResult\n";
-        assert(false);
+        std::exit(EXIT_FAILURE);
     }
     if (!expectedResult.good()) 
     {
         std::cerr << "Error opening expectedResult\n";
         std::cerr << "Is the the test result name correctly?\n";
-        assert(false);
+        std::exit(EXIT_FAILURE);
     }
 
     while(std::getline(simResult, simResultLine) && std::getline(expectedResult, expectedResultLine))
@@ -104,13 +96,29 @@ void testFramework::parseResult()
     simResult.close();
     expectedResult.close();
 }
-// /opt/riscv/bin/riscv64-unknown-linux-gnu-as /home/matthew/ece586-riscv-sim/testing/load/testResources/assembly/load_byte_unsigned.s -o /home/matthew/Downloads/a.out
+
 void testFramework::generateMemImage()
 {
-    m_assemblerPath = getPath("riscv64-unknown-linux-gnu-as");
-    m_objdumpPath = getPath("riscv64-unknown-linux-gnu-objdump");
+    m_assemblerPath = getPath("(?:^|:)([^:]*riscv64-[^:]*-as)(?=:|$)");
+    m_objdumpPath = getPath("(?:^|:)([^:]*riscv64-[^:]*-objdump)(?=:|$)");
     std::string assemblyCmd = m_assemblerPath + " -march=rv32i -mabi=ilp32 " + m_assemblyFileLocation + " -o " + m_objFileLocation;
     std::string disassemblyCmd = m_objdumpPath + " -d " + m_objFileLocation + " > " + m_disassemblyFileLocation;
+
+    if(m_assemblerPath.empty())
+    {
+        std::cout << "riscv64 assembler not found in PATH." << std::endl;
+        std::cout << "Please add it to PATH (probably in your .bashrc file) and try again"<<std::endl;
+        std::cout << "Hint, add something that should look like: export PATH=\"/opt/riscv/bin/riscv64-unknown-linux-gnu-as:$PATH\" to the end of your .bashrc file" << std::endl;
+        std::exit(EXIT_FAILURE);;
+    }
+
+    if(m_objdumpPath.empty())
+    {
+        std::cout << "riscv64 objdump not found in PATH." << std::endl;
+        std::cout << "Please add it to PATH (probably in your .bashrc file) and try again"<<std::endl;
+        std::cout << "Hint, add something that should look like: export PATH=\"/opt/riscv/bin/riscv64-unknown-linux-gnu-objdump:$PATH\" to the end of your .bashrc file" << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
     system(assemblyCmd.c_str());
     system(disassemblyCmd.c_str());
@@ -122,12 +130,12 @@ void testFramework::generateMemImage()
     if (!disassembly.good()) 
     {
         std::cerr << "Error opening disassembly file: "<< m_disassemblyFileLocation <<std::endl;
-        assert(false);
+        std::exit(EXIT_FAILURE);
     }
     if (!memImage.good()) 
     {
         std::cerr << "Error opening memImage file: "<< m_memImageLocation <<std::endl;
-        assert(false);
+        std::exit(EXIT_FAILURE);
     }
 
     std::string line;
@@ -136,7 +144,6 @@ void testFramework::generateMemImage()
     // followed by an address (digits) and a colon,
     // then some whitespace and a hexadecimal value.
     std::regex pattern("^\\s*([0-9a-fA-F]+:)\\s+([0-9a-fA-F]{8})");
-    //std::regex pattern("^\\s*(\\d+):\\s+([0-9a-fA-F]+)");
 
     while(std::getline(disassembly, line))
     {
@@ -156,38 +163,22 @@ void testFramework::generateMemImage()
     }
 }
 
-// /opt/riscv/bin/riscv64-unknown-linux-gnu-as -ahld prog.s
-// rvobjdump -d prog.o > prog.dis
-// matthew@sonOfAnton:~/ece586-riscv-sim/testing/load/testResources/assembly$ /opt/riscv/bin/riscv64-unknown-linux-gnu-as -march=rv32i -mabi=ilp32 load_byte_unsigned.s
-// matthew@sonOfAnton:~/ece586-riscv-sim/testing/load/testResources/assembly$ /opt/riscv/bin/riscv64-unknown-linux-gnu-objdump -d a.out 
-std::string testFramework::getPath(std::string filename)
-{   
+std::string testFramework::getPath(std::string fileName)
+{       
     std::string pathEnv = std::getenv("PATH");
-    std::string dir;
-    bool found = false;
+    std::string dir = "";
 
     if(pathEnv.empty())
     {
-        std::cerr<<"PATH enviroment variable not found"<<std::endl;
-        assert(false); // kill execution
+        std::cerr<<"PATH environment variable not found"<<std::endl;
+        std::exit(EXIT_FAILURE); // kill execution
     }
-
-    std::istringstream iss(pathEnv);
-    while (std::getline(iss, dir, ':'))
-    {   
-        if(dir.find(filename) != std::string::npos)
-        {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) 
+    std::regex pattern(fileName);
+    std::smatch match;
+    if(std::regex_search(pathEnv, match, pattern))
     {
-        std::cout << "Required binary '" << filename << "' not found in PATH." << std::endl;
-        std::cout << "Please add it to PATH (probably in your .bashrc file) and try again"<<std::endl;
-        std::cout << "Hint, add something that should look like: export PATH=\"/opt/riscv/bin/riscv64-unknown-linux-gnu-as:$PATH\" to the end of your .bashrc file" << std::endl;
-        assert(false);
+        std::cout<<"match: "<<match[1]<<std::endl;
+        dir = match[1];
     }
 
     return dir;
