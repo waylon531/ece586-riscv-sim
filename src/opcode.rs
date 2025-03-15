@@ -71,6 +71,11 @@ pub enum Operation {
     SH(Register, Register, Immediate),
     SB(Register, Register, Immediate),
 
+    // Division operations
+    DIV(Register, Register, Register),
+    DIVU(Register, Register, Register),
+    REM(Register, Register, Register),
+    REMU(Register, Register, Register),
     // Evironment call/syscall
     ECALL,
 
