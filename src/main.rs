@@ -5,10 +5,7 @@ mod opcode;
 mod register;
 mod webui;
 mod statetransfer;
-<<<<<<< HEAD
 mod environment;
-=======
->>>>>>> f59610f (Added ecall functions)
 
 use machine::{ExecutionError, Machine};
 
@@ -66,6 +63,10 @@ struct Cli {
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
+    if (cli.single_step && ! stdout().is_terminal()) {
+        println!("Cannot enter interactive mode when stdout is not a terminal.");
+        return Ok(ExitCode::FAILURE);
+    }
     // if we're not running the web ui
     if !cli.web_ui {
         // just launch into the simulator
@@ -102,7 +103,7 @@ fn main() -> std::io::Result<ExitCode> {
 fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
     // Set up input and output
     
-    let mut stdout = stdout().into_raw_mode().unwrap();
+    
     let stdin = stdin();
 
     let capacity = if cli.memory_top == 0 {
@@ -138,7 +139,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     );
 
     // Run the machine to completion
-    let result = machine.run(cli.single_step, &stdin, &mut stdout, commands_rx,state_tx);
+    let result = machine.run(cli.single_step, &stdin, commands_rx,state_tx);
 
     let mut error_message = None;
 
@@ -164,11 +165,13 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     }
 
     // Print the registers one last time
-    write!(stdout,"{}",termion::clear::All)?;
-    write!(stdout,"{}",machine.display_info())?;
+    environment::clearTerm();
+    environment::writeStdout(&machine.display_info());
 
     if let Some(err) = error_message {
-        write!(stdout,"\r\n{}\r\n",err)?;
+        environment::writeNewline();
+        environment::writeStdout(&err);
+        environment::writeNewline();
     }
 
     // Exit

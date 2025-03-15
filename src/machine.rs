@@ -67,7 +67,7 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
         // reset timer
         self.env.reset_timer();
         /* TODO: Check if commands and state channels are present */
@@ -101,17 +101,18 @@ impl Machine {
 
             if should_trigger_cmd {
                 // print debug state
-                write!(stdout,"{}",termion::clear::All)?;
-                write!(stdout,"{}",self.display_info())?;
+                environment::clearTerm();
+                environment::writeStdout(&self.display_info());
+                environment::writeNewline();
 
-                write!(stdout,"\r\n")?;
 
                 // print status lines
                 for line in status.drain(..) {
-                    write!(stdout,"{}\r\n",line)?;
+                    environment::writeStdout(&line);
+                    environment::writeNewline();
                 }
 
-                write!(stdout,"\r\n")?;
+                environment::writeStdout("\r\n");
 
                 // read prompt
                 let readline = rl.readline(">> ");
@@ -220,9 +221,12 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"\rPC:\t  {:#010x}", self.pc).unwrap();
+        // Why am I doing this crazy shit? To ensure we only print terminal control characters if the output is a terminal.
+        if environment::whichNewLine() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
+        write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            write!(buf,"{}",environment::whichNewLine()).unwrap();
+            write!(buf,"{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
             if i < 16 {
                 let context: i32 = (i as i32-8)*4;
                 let to_fetch = self.pc.overflowing_add_signed(context);
@@ -258,7 +262,7 @@ impl Machine {
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-        write!(buf,"\r\n").unwrap();
+        environment::writeNewline();
         buf
 
     }
@@ -354,8 +358,6 @@ impl Machine {
     }
     // Fetch, decode, and execute an instruction
     pub fn step(&mut self) -> Result<(), ExecutionError> {
-        // start timer 
-        let t = std::time::Instant::now();
         use Operation::*;
         // First, check if we're at a breakpoint, and cannot pass over it
         if self.breakpoints.contains(&self.pc) && !self.pass_breakpoint {
