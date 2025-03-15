@@ -1,5 +1,32 @@
+use clap::builder::Str;
+use termion::raw::IntoRawMode;
+
 use crate::machine::ExecutionError;
 use std::time::Instant;
+use std::io::{stdout,IsTerminal, Write};
+
+/* This is the stupidest way on the planet to do this */
+pub fn whichNewLine() -> &'static str {
+    match stdout().is_terminal() { true => "\r\n", false => "\n" }
+}
+pub fn writeNewline() {
+    writeStdout(match stdout().is_terminal() { true => "\r\n", false => "\n" });
+}
+pub fn clearTerm() {
+    if (stdout().is_terminal()) {
+        let mut stdout = stdout().into_raw_mode().unwrap();
+        write!(stdout,"{}",termion::clear::All);
+    }
+}
+pub fn writeStdout(output: &str) {
+    if (stdout().is_terminal()) {
+        let mut stdout = stdout().into_raw_mode().unwrap();
+        write!(stdout,"{}",output);
+    } else {
+        print!("{}", output);
+    }
+
+}
 
 pub struct Environment {
     fdtable: [i32; 1024],

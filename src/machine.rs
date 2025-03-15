@@ -106,7 +106,6 @@ impl Machine {
                 environment::write_stdout(&self.display_info());
                 environment::write_newline();
 
-                write!(stdout,"\r\n")?;
 
                 // handle all watchlist lines
                 // this is way hackier than I thought ...
