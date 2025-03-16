@@ -1,5 +1,6 @@
 use std::ops::Index;
 use strum::EnumString;
+use std::fmt;
 
 #[derive(PartialEq, Debug, EnumString,Clone,Copy)]
 #[strum(ascii_case_insensitive)]
@@ -129,6 +130,15 @@ impl Index<Register> for [u32] {
         // and not contained in a slice
         } else {
             self.index(index.to_num() as usize - 1)
+        }
+    }
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Register::Zero => write!(f,"ZERO"),
+            _ => write!(f,"{:?}",self)
         }
     }
 }
