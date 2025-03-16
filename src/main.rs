@@ -168,8 +168,10 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
 
     // Print the registers one last time
     if !cli.quiet {
+
         environment::clear_term();
         environment::write_stdout(&machine.display_info());
+
     }
 
     if let Some(err) = error_message {

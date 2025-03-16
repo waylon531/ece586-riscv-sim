@@ -72,6 +72,7 @@ impl Machine {
         self.env.reset_timer();
         /* TODO: Check if commands and state channels are present */
 
+
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
@@ -106,6 +107,23 @@ impl Machine {
                 environment::write_stdout(&self.display_info());
                 environment::write_newline();
 
+
+                // handle all watchlist lines
+                // this is way hackier than I thought ...
+                for cmd in watchlist.iter() {
+                    let mut dummy_run = false;
+                    let mut dummy_watchlist = Vec::new();
+                    let mut new_status = cmd.execute(
+                        self,
+                        &mut should_step, 
+                        &mut should_trigger_cmd,
+                        &mut dummy_run,
+                        &mut dummy_watchlist
+                        )?;
+                    for line in new_status.drain(..) {
+                        status.push(line);
+                    }
+                }
 
                 // handle all watchlist lines
                 // this is way hackier than I thought ...
