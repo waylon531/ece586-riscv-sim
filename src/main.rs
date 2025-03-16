@@ -1,5 +1,6 @@
 mod debugger;
 mod decode;
+mod devices;
 mod machine;
 mod opcode;
 mod register;
@@ -55,6 +56,11 @@ struct Cli {
     /// Suppress exit code returned from emulated program
     #[arg(long)]
     suppress_status: bool,
+
+    // These have to be parsed later, clap isnt smart enough to parse them
+    /// Enable a specific device. Format is `--device NAME,opt=foo,opt2=foo2`.
+    #[arg(long)]
+    device: Vec<String>
 }
 
 fn main() -> std::io::Result<ExitCode> {
