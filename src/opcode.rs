@@ -69,11 +69,6 @@ pub enum Operation {
     SH(Register, Register, Immediate),
     SB(Register, Register, Immediate),
 
-    // Division operations
-    DIV(Register, Register, Register),
-    DIVU(Register, Register, Register),
-    REM(Register, Register, Register),
-    REMU(Register, Register, Register),
     // Evironment call/syscall
     ECALL,
 
@@ -171,11 +166,6 @@ impl Operation {
                         0b110 => ORI(rd, rs1, imm_s),
                         0b111 => ANDI(rd, rs1, imm_s),
                         _ => return Err(ParseError::InvalidInstruction(combined)),
-                    },
-                    0b1110011 => match imm {
-                            1 => EBREAK,
-                            0 => ECALL,
-                            _    => return Err(ParseError::InvalidInstruction(combined))
                     },
                     _ => return Err(ParseError::InvalidOpcode(opcode)),
                 }
