@@ -1,6 +1,8 @@
 use crate::decode::{bytes_to_u32, InstructionType, ParseError, bitrange};
 use crate::register::Register;
 
+use std::fmt;
+
 // I'm not sure where sign extension should happen, but it's probably fine to do it in the VM
 // Maybe there could be different types of immediates here depending on the size?
 // Which instructions sign-extend the immediate?
@@ -230,6 +232,105 @@ impl Operation {
             Err(e) => return Err(e),
         })
     }
+}
+
+impl fmt::Display for Operation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Operation::*;
+        match self {
+            ADDI(r1, r2, imm) =>
+                write!(f,"ADDI  {r1}, {r2}, {imm:#x}"),
+            SLTI(r1, r2, imm) =>
+                write!(f,"SLTI  {r1}, {r2}, {imm:#x}"),
+            SLTIU(r1, r2, imm) =>
+                write!(f,"SLTIU {r1}, {r2}, {imm:#x}"),
+            ANDI(r1, r2, imm) => 
+                write!(f,"ANDI  {r1}, {r2}, {imm:#x}"),
+            ORI(r1, r2, imm) => 
+                write!(f,"ORI   {r1}, {r2}, {imm:#x}"),
+            XORI(r1, r2, imm) => 
+                write!(f,"ORI   {r1}, {r2}, {imm:#x}"),
+            SLLI(r1, r2, imm) => 
+                write!(f,"SLLI  {r1}, {r2}, {imm:#x}"),
+            SRLI(r1, r2, imm) => 
+                write!(f,"SRLI  {r1}, {r2}, {imm:#x}"),
+            SRAI(r1, r2, imm) => 
+                write!(f,"SRAI  {r1}, {r2}, {imm:#x}"),
+            LUI(r1, imm) => 
+                write!(f,"LUI   {r1}, {imm:#x}"),
+            AUIPC(r1, imm) => 
+                write!(f,"AUIPC {r1}, {imm:#x}"),
+
+
+            // Integer, register, register instructions
+            // RD first, then SRC1, then SRC2
+            ADD(r1, r2, r3) => 
+                write!(f,"ADD   {r1}, {r2}, {r3}"),
+            SLTU(r1, r2, r3) => 
+                write!(f,"SLTU  {r1}, {r2}, {r3}"),
+            SLT(r1, r2, r3) => 
+                write!(f,"SLT   {r1}, {r2}, {r3}"),
+            AND(r1, r2, r3) => 
+                write!(f,"AND   {r1}, {r2}, {r3}"),
+            OR(r1, r2, r3) => 
+                write!(f,"OR    {r1}, {r2}, {r3}"),
+            XOR(r1, r2, r3) => 
+                write!(f,"XOR   {r1}, {r2}, {r3}"),
+            SLL(r1, r2, r3) => 
+                write!(f,"SLL   {r1}, {r2}, {r3}"),
+            SRL(r1, r2, r3) => 
+                write!(f,"SRL   {r1}, {r2}, {r3}"),
+            SUB(r1, r2, r3) => 
+                write!(f,"SUB   {r1}, {r2}, {r3}"),
+            SRA(r1, r2, r3) => 
+                write!(f,"SRA   {r1}, {r2}, {r3}"),
+
+            // Control transfer instructions
+            // Normal, unconditional jumps use x0 as the register
+            JAL(r1, imm) => 
+                write!(f,"JAL   {r1}, {imm:#x}"),
+            JALR(r1, r2, imm) => 
+                write!(f,"JALR  {r1}, {r2}, {imm:#x}"),
+
+            // Conditional branches
+            // Which register is first, rs1 or rs2?
+            BEQ(r1, r2, imm) => 
+                write!(f,"BEQ   {r1}, {r2}, {imm:#x}"),
+            BNE(r1, r2, imm) => 
+                write!(f,"BNE   {r1}, {r2}, {imm:#x}"),
+            BLT(r1, r2, imm) => 
+                write!(f,"BLT   {r1}, {r2}, {imm:#x}"),
+            BLTU(r1, r2, imm) => 
+                write!(f,"BLTU  {r1}, {r2}, {imm:#x}"),
+            BGE(r1, r2, imm) => 
+                write!(f,"BGE   {r1}, {r2}, {imm:#x}"),
+            BGEU(r1, r2, imm) => 
+                write!(f,"BGEU  {r1}, {r2}, {imm:#x}"),
+
+            // Loads and stores
+            LW(r1, r2, imm) => 
+                write!(f,"LW    {r1}, {r2}, {imm:#x}"),
+            LH(r1, r2, imm) => 
+                write!(f,"LH    {r1}, {r2}, {imm:#x}"),
+            LHU(r1, r2, imm) => 
+                write!(f,"LHU   {r1}, {r2}, {imm:#x}"),
+            LB(r1, r2, imm) => 
+                write!(f,"LB    {r1}, {r2}, {imm:#x}"),
+            LBU(r1, r2, imm) => 
+                write!(f,"LBU   {r1}, {r2}, {imm:#x}"),
+
+            SW(r1, r2, imm) => 
+                write!(f,"SW    {r1}, {r2}, {imm:#x}"),
+            SH(r1, r2, imm) => 
+                write!(f,"SH    {r1}, {r2}, {imm:#x}"),
+            SB(r1, r2, imm) => 
+                write!(f,"SB    {r1}, {r2}, {imm:#x}"),
+
+            _ => write!(f, "{:?}", self)
+
+        }
+    }
+
 }
 #[cfg(test)]
 mod tests {
