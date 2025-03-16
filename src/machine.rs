@@ -102,9 +102,9 @@ impl Machine {
 
             if should_trigger_cmd {
                 // print debug state
-                environment::clearTerm();
-                environment::writeStdout(&self.display_info());
-                environment::writeNewline();
+                environment::clear_term();
+                environment::write_stdout(&self.display_info());
+                environment::write_newline();
 
 
                 // handle all watchlist lines
@@ -126,11 +126,11 @@ impl Machine {
 
                 // print status lines
                 for line in status.drain(..) {
-                    environment::writeStdout(&line);
-                    environment::writeNewline();
+                    environment::write_stdout(&line);
+                    environment::write_newline();
                 }
 
-                environment::writeStdout("\r\n");
+                environment::write_stdout("\r\n");
 
                 // read prompt
                 let readline = rl.readline(">> ");
@@ -212,10 +212,10 @@ impl Machine {
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
         // Why am I doing this crazy shit? To ensure we only print terminal control characters if the output is a terminal.
-        if environment::whichNewLine() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
+        if environment::which_new_line() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
         write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"{}",environment::whichNewLine()).unwrap();
+            write!(buf,"{}",environment::which_new_line()).unwrap();
             write!(buf,"{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
             if i < 16 {
                 let context: i32 = (i as i32-8)*4;
@@ -253,7 +253,7 @@ impl Machine {
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-        environment::writeNewline();
+        environment::write_newline();
         buf
 
     }
@@ -541,27 +541,14 @@ impl Machine {
 
             // Division
 
-            DIV(rd, rs1, rs2) => {
-
-            },
-            DIVU(rd, rs1, rs2) => {
-
-            },
-            REM(rd, rs1, rs2) => {
-
-            },
-            REMU(rd, rs1, rs2) => {
-
-            },
-
 
             // Evironment call/syscall
             ECALL => {
                 /* Fun with system calls! I think this is technically a BIOS? */
                 // this should definitely be its own module I feel
                 // a7: syscall, a0-a2: arguments
-                match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2]) {
-                    Ok(result) => { self.set_reg(Register::A0, result)},
+                match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2], &mut self.memory) {
+                    Ok(result) => { self.set_reg(Register::A0, result as u32)},
                     Err(e) => { return Err(e) }
                 };
                 
