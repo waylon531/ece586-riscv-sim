@@ -23,3 +23,43 @@ TEST(loadStoreTest, load_empty_byte_unsigned)
     // true if output matches expected
     EXPECT_TRUE(framework.run());
 }
+
+TEST(loadStoreTest, store_byte_load_half_word_unsigned)
+{
+    testFramework framework(simBinaryLocation, rootPath, "store_byte_load_half_word_unsigned", "loadStore");
+
+    // true if output matches expected
+    EXPECT_TRUE(framework.run());
+}
+
+TEST(loadStoreTest, store_half_word_load_half_word_unsigned)
+{
+    testFramework framework(simBinaryLocation, rootPath, "store_half_word_load_half_word_unsigned", "loadStore");
+
+    // true if output matches expected
+    EXPECT_TRUE(framework.run());
+}
+
+TEST(loadStoreTest, store_word_load_word)
+{
+    testFramework framework(simBinaryLocation, rootPath, "store_word_load_word", "loadStore");
+
+    // true if output matches expected
+    EXPECT_TRUE(framework.run());
+}
+
+TEST(loadStoreTest, store_word_load_different_bytes_unsigned)
+{
+    testFramework framework(simBinaryLocation, rootPath, "store_word_load_different_bytes_unsigned", "loadStore");
+
+    // true if output matches expected
+    EXPECT_TRUE(framework.run());
+}
+
+TEST(loadStoreTest, store_word_load_different_bytes_signed)
+{
+    testFramework framework(simBinaryLocation, rootPath, "store_word_load_different_bytes_signed", "loadStore");
+
+    // true if output matches expected
+    EXPECT_TRUE(framework.run());
+}
