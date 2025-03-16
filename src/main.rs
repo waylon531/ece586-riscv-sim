@@ -30,6 +30,8 @@ enum DumpFmt {
 struct Cli {
     #[arg(short, long)]
     verbose: bool,
+    #[arg(short, long)]
+    quiet: bool,
     #[arg(long)]
     single_step: bool,
     #[arg(value_name = "FILE", default_value = "program.mem")]
@@ -142,8 +144,10 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     }
 
     // Print the registers one last time
-    write!(stdout,"{}",termion::clear::All)?;
-    write!(stdout,"{}",machine.display_info())?;
+    if !cli.quiet {
+        write!(stdout,"{}",termion::clear::All)?;
+        write!(stdout,"{}",machine.display_info())?;
+    }
 
     if let Some(err) = error_message {
         write!(stdout,"\r\n{}\r\n",err)?;
