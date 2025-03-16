@@ -36,6 +36,8 @@ enum DumpFmt {
 struct Cli {
     #[arg(short, long)]
     verbose: bool,
+    #[arg(short, long)]
+    quiet: bool,
     #[arg(long)]
     single_step: bool,
     #[arg(value_name = "FILE", default_value = "program.mem")]
@@ -165,8 +167,10 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     }
 
     // Print the registers one last time
-    environment::clear_term();
-    environment::write_stdout(&machine.display_info());
+    if !cli.quiet {
+        environment::clear_term();
+        environment::write_stdout(&machine.display_info());
+    }
 
     if let Some(err) = error_message {
         environment::write_newline();
