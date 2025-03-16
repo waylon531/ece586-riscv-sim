@@ -1,4 +1,4 @@
-use crate::debugger::{DebugCommand,self,BreakpointIdentifier};
+use crate::debugger::{DebugCommand,self};
 use crate::decode::ParseError;
 use crate::opcode::Operation;
 use crate::register::Register;
@@ -53,7 +53,7 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
@@ -63,6 +63,7 @@ impl Machine {
         let mut should_step = None;
         // Status messages to print
         let mut status: Vec<String> = Vec::new();
+        let mut watchlist: Vec<DebugCommand> = Vec::new();
         loop {
 
             // Check if we stepping for N times, and if we are at the end then pull the debugger
@@ -83,6 +84,23 @@ impl Machine {
                 write!(stdout,"{}",self.display_info())?;
 
                 write!(stdout,"\r\n")?;
+
+                // handle all watchlist lines
+                // this is way hackier than I thought ...
+                for cmd in watchlist.iter() {
+                    let mut dummy_run = false;
+                    let mut dummy_watchlist = Vec::new();
+                    let mut new_status = cmd.execute(
+                        self,
+                        &mut should_step, 
+                        &mut should_trigger_cmd,
+                        &mut dummy_run,
+                        &mut dummy_watchlist
+                        )?;
+                    for line in new_status.drain(..) {
+                        status.push(line);
+                    }
+                }
 
                 // print status lines
                 for line in status.drain(..) {
@@ -119,56 +137,28 @@ impl Machine {
                     }
                 };
 
+                let mut run = false;
+                
+                let mut new_status = command.execute(
+                    self,
+                    &mut should_step, 
+                    &mut should_trigger_cmd,
+                    &mut run,
+                    &mut watchlist
+                    )?;
 
-                match command {
-                    DebugCommand::EXIT => return Err(ExecutionError::HaltedByUser),
-                    DebugCommand::HELP => for line in DebugCommand::usage() { status.push(line.to_string()) },
-                    DebugCommand::CONTINUE => {should_trigger_cmd = false;},
-                    DebugCommand::STEP(count) => {
-                        should_trigger_cmd = false;
-                        should_step = Some(count);
-                    },
-                    DebugCommand::BREAK(addr) => {
-                        if !self.breakpoints.contains(&addr) {
-                            self.breakpoints.push(addr)
-                        } else {
-                            status.push(
-                                format!("Unable to insert duplicate breakpoint at {0:#010x}", addr));
-                        }
-                        status.push(format!("Added breakpoint {} at {:#010x}",self.breakpoints.len(),addr));
-                        continue;
 
-                    },
-                    DebugCommand::RMBRK(BreakpointIdentifier::Index(index)) => {
-                        self.breakpoints.remove(index);
-                        status.push(format!("Successfully removed breakpoint {}",index));
-                        continue;
-                    },
-                    DebugCommand::RMBRK(BreakpointIdentifier::Addr(address)) => {
-                        let mut to_remove = None;
-                        for (k,v) in self.breakpoints.iter().enumerate() {
-                            if *v == address {
-                                to_remove = Some(k);
-                                break;
-                            }
-                        }
-                        if let Some(key) = to_remove {
-                            self.breakpoints.remove(key);
-                            status.push(format!("Successfully removed breakpoint {}",key));
-                        } else {
-                            status.push("Unable to find breakpoint".to_string());
-                        };
-                        continue;
-                    },
-                    DebugCommand::LSBRK => {
-                        for (index,address) in self.breakpoints.iter().enumerate() {
-                            status.push(format!("{index}: {address:#010x}"));
-                        }
-                        continue;
-                    },
-
-                    _ => unimplemented!()
+                // Combine vecs
+                for line in new_status.drain(..) {
+                    status.push(line);
                 }
+
+                // Many commands will instantly return control back to the prompt without
+                // stepping execution at all
+                if !run {
+                    continue;
+                }
+
                 // Note: this will only get updated on commands that step or continue
                 //       not 100% sure that's what we want yet
                 last_cmd = command;
@@ -208,20 +198,21 @@ impl Machine {
                     (addr, false) => {
                         let display_me = match self.read_instruction_bytes(addr) {
                             Ok(bytes) => match Operation::from_bytes(bytes) {
-                                Ok(op) => format!("{:?}",op),
+                                Ok(op) => format!("{}",op),
                                 Err(e) => format!("{}",e)
                             },
                             Err(e) => format!("{}",e)
                         };
-                        write!(buf,"\t\t{addr:#010x}: {}",display_me).unwrap();
+                        if i == 8 {
+                            write!(buf,"\t PC ->  {addr:#010x}: {}",display_me).unwrap();
+                        } else {
+                            write!(buf,"\t\t{addr:#010x}: {}",display_me).unwrap();
+                        }
                     },
                     (_num, true) => {
 
                     }
                 };
-                if i == 8 {
-                    write!(buf,"\t<- PC").unwrap();
-                }
             } else if i > 16 {
                 // Offset to fetch
                 let context = (i-17)*4;
@@ -250,6 +241,13 @@ impl Machine {
         }
         bytes
 
+    }
+    /// Return a modifiable list of breakpoints
+    pub fn breakpoints(&mut self) -> &mut Vec<u32> {
+        &mut self.breakpoints
+    }
+    pub fn get_reg(&mut self,reg: Register) -> u32 {
+        self.registers[reg]
     }
     pub fn set_reg(&mut self,reg: Register, value: u32) {
         let reg_num = reg.to_num();
