@@ -298,10 +298,10 @@ impl Machine {
             Err(ExecutionError::InstructionAccessFault(addr))
         }
     }
-    pub fn read_byte(&self, addr: u32) -> Result<u8, ExecutionError> {
+    pub fn read_byte(&self, addr: u32) -> Result<i8, ExecutionError> {
         //TODO in future: check if this is a memory mapped device
         if addr < self.memory_top || self.memory_top == 0 {
-            Ok(self.memory[addr as usize])
+            Ok(self.memory[addr as usize] as i8)
         } else {
             Err(ExecutionError::LoadAccessFault(addr))
         }
@@ -317,11 +317,11 @@ impl Machine {
             Err(ExecutionError::LoadAccessFault(addr))
         }
     }
-    pub fn read_halfword(&self, addr: u32) -> Result<u16, ExecutionError> {
+    pub fn read_halfword(&self, addr: u32) -> Result<i16, ExecutionError> {
         //TODO in future: check if this is a memory mapped device
         if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
-            Ok(self.memory[addr as usize] as u16
-                + ((self.memory[addr.overflowing_add(1).0 as usize] as u16) << 8))
+            Ok((self.memory[addr as usize] as u16
+                + ((self.memory[addr.overflowing_add(1).0 as usize] as u16) << 8)) as i16)
         } else {
             Err(ExecutionError::LoadAccessFault(addr))
         }
