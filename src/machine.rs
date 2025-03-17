@@ -487,7 +487,9 @@ impl Machine {
             ),
             LHU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
+                // Note the two as statements here, with just as 32 sign extension will still
+                // happen
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u16 as u32,
             ),
             LB(rd, rs1, imm) => self.set_reg(
                 rd,
@@ -495,7 +497,7 @@ impl Machine {
             ),
             LBU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u8 as u32,
             ),
 
             SW(rs1, rs2, imm) => self.store_word(
