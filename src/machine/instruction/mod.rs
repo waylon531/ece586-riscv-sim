@@ -1,41 +1,29 @@
+mod parse;
+pub use parse::ParseError;
+
+// Declare extensions here
+mod integer_base;
+
 pub struct Opcode {
     opcode: u8,
     name: String,
-    format: InstructionType
+    format: Format
 }
 
-pub enum IT_T {
-    R,
-    I,
-    S,
-    B,
-    J,
-    U
+enum FormatName {
+    RV32I(integer_base::RV32IFormatName)
 }
-
-struct InstructionType {
-    fields: Vec<RawField>,
-    name: String,
-}
-impl InstructionType {
-    pub fn new(&mut self, name: &str) -> InstructionType {
-        InstructionType{ fields: Vec::new(), name: str::to_string(name) }
-    }
+pub struct Format {
+    fields: Vec<Field>,
+    name: FormatName,
 }
 
 
-//struct Opcode {
-
-//}
-
-
-struct RawField {
-
-    extract: fn(u32) -> u32,
+pub struct Field {
+    sections: Vec<(u8,u8)>,
+    name: FieldName
 }
-impl RawField {
-    pub fn new(&mut self, f: fn(u32) -> u32) {
-        self.extract = f;
-    }
-} 
-*/
+
+enum FieldName {
+    RV32I(integer_base::RV32IFieldName)
+}
