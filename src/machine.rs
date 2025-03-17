@@ -37,7 +37,7 @@ pub struct Machine {
     //       Might be way slow though to iterate through this every cycle though
     breakpoints: Vec<u32>,
     #[serde(skip_serializing)]
-    devices: Vec<Box<dyn Device>>
+    devices: Vec<Device>
 }
 impl Machine {
     pub fn new(
@@ -45,7 +45,7 @@ impl Machine {
         stack_addr: Option<u32>, 
         memory_top: u32, 
         memmap: Box<[u8]>, 
-        devices: Vec<Box<dyn Device>>
+        devices: Vec<Device>
     ) -> Self {
         let mut m = Machine {
                     memory: memmap,

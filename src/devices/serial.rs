@@ -1,4 +1,4 @@
-use super::{DeviceConfigError,ByteDevice};
+use super::{DeviceConfigError,ByteDevice,Device};
 
 use std::collections::{HashMap,VecDeque};
 use std::error;
@@ -112,7 +112,7 @@ pub struct Serial {
     
 }
 impl Serial {
-    pub fn from_config(options: HashMap<String,String>) -> Result<Box<Serial>,DeviceConfigError> {
+    pub fn from_config(options: HashMap<String,String>) -> Result<Device,DeviceConfigError> {
         let base_address = match options.get("address") {
             Some(a) => u32::from_str_radix(a,10)?,
             None => 0x3F8
@@ -123,11 +123,11 @@ impl Serial {
             Some(s) => return Err(DeviceConfigError::InvalidOption(s.to_string()))
 
         };
-        Ok(Box::new(Serial {
+        Ok(Device::ByteDevice(Box::new(Serial {
             base_address,
             backend,
             read_buffer
-        }))
+        })))
 
     }
 
