@@ -5,16 +5,27 @@ use crate::register::Register;
 
 use rustyline::error::ReadlineError;
 use serde::Serialize;
+use core::time;
 use std::fmt::Write;
-use std::io::{Stdout,Stdin,self};
-
+use std::io::Seek;
+use std::thread::sleep;
+use std::{
+    fs::File,
+    io::{self, Read,Write as ioWrite,Stdout,Stdin},
+    os::unix::io::FromRawFd,
+};
+use single_value_channel::Updater as SvcSender;
+use crossbeam_channel::Receiver as CbReceiver;
 use educe::Educe;
 
 use thiserror::Error;
 
+use crate::statetransfer;
+use crate::environment::{self, Environment};
+
 #[derive(Serialize)]
 pub struct Machine {
-    // Maybe this should be on the heap
+    // Maybe this should be  on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
     // we can load?
     //
@@ -34,7 +45,9 @@ pub struct Machine {
     //       index/breakpoint number to breakpoint which is nice for ui
     //
     //       Might be way slow though to iterate through this every cycle though
-    breakpoints: Vec<u32>
+    breakpoints: Vec<u32>,
+    #[serde(skip_serializing)]
+    env: Environment
 }
 impl Machine {
     pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
@@ -44,7 +57,8 @@ impl Machine {
                     memory_top,
                     pc: starting_addr,
                     pass_breakpoint: false,
-                    breakpoints: Vec::new()
+                    breakpoints: Vec::new(),
+                    env:Environment::new()
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
         // nearest 16 bytes
@@ -53,7 +67,12 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+        // reset timer
+        self.env.reset_timer();
+        /* TODO: Check if commands and state channels are present */
+
+
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
@@ -65,7 +84,11 @@ impl Machine {
         let mut status: Vec<String> = Vec::new();
         let mut watchlist: Vec<DebugCommand> = Vec::new();
         loop {
-
+            /*
+                At the start of each cycle, if the web server is running, we want to communicate with it.
+                We exchange information - we send the current state of the machine, and we read commands sent from the web interface.
+                Those commands may include modifications to registers or memory addresses - so we interpret those.
+             */
             // Check if we stepping for N times, and if we are at the end then pull the debugger
             // back up
             // Otherwise decrement the step counter
@@ -80,10 +103,27 @@ impl Machine {
 
             if should_trigger_cmd {
                 // print debug state
-                write!(stdout,"{}",termion::clear::All)?;
-                write!(stdout,"{}",self.display_info())?;
+                environment::clear_term();
+                environment::write_stdout(&self.display_info());
+                environment::write_newline();
 
-                write!(stdout,"\r\n")?;
+
+                // handle all watchlist lines
+                // this is way hackier than I thought ...
+                for cmd in watchlist.iter() {
+                    let mut dummy_run = false;
+                    let mut dummy_watchlist = Vec::new();
+                    let mut new_status = cmd.execute(
+                        self,
+                        &mut should_step, 
+                        &mut should_trigger_cmd,
+                        &mut dummy_run,
+                        &mut dummy_watchlist
+                        )?;
+                    for line in new_status.drain(..) {
+                        status.push(line);
+                    }
+                }
 
                 // handle all watchlist lines
                 // this is way hackier than I thought ...
@@ -104,10 +144,11 @@ impl Machine {
 
                 // print status lines
                 for line in status.drain(..) {
-                    write!(stdout,"{}\r\n",line)?;
+                    environment::write_stdout(&line);
+                    environment::write_newline();
                 }
 
-                write!(stdout,"\r\n")?;
+                environment::write_stdout("\r\n");
 
                 // read prompt
                 let readline = rl.readline(">> ");
@@ -188,9 +229,12 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"\rPC:\t  {:#010x}", self.pc).unwrap();
+        // Why am I doing this crazy shit? To ensure we only print terminal control characters if the output is a terminal.
+        if environment::which_new_line() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
+        write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            write!(buf,"{}",environment::which_new_line()).unwrap();
+            write!(buf,"{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
             if i < 16 {
                 let context: i32 = (i as i32-8)*4;
                 let to_fetch = self.pc.overflowing_add_signed(context);
@@ -227,7 +271,7 @@ impl Machine {
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-        write!(buf,"\r\n").unwrap();
+        environment::write_newline();
         buf
 
     }
@@ -513,8 +557,20 @@ impl Machine {
                 self.registers[rs1].overflowing_add_signed(imm).0,
             )?,
 
+            // Division
+
+
             // Evironment call/syscall
-            ECALL => {}
+            ECALL => {
+                /* Fun with system calls! I think this is technically a BIOS? */
+                // this should definitely be its own module I feel
+                // a7: syscall, a0-a2: arguments
+                match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2], &mut self.memory) {
+                    Ok(result) => { self.set_reg(Register::A0, result as u32)},
+                    Err(e) => { return Err(e) }
+                };
+                
+            }
 
             // Breakpoint for us
             EBREAK => return Err(ExecutionError::Breakpoint(self.pc)),
@@ -531,6 +587,8 @@ impl Machine {
         if increment_pc {
             self.pc = self.pc.overflowing_add(4).0;
         }
+
+        
         Ok(())
     }
 }
@@ -564,6 +622,8 @@ pub enum ExecutionError {
     ReadlineError(#[educe(PartialEq(ignore))] #[from] ReadlineError),
     #[error("Error while parsing debug command: {0}")]
     DebugParseError(#[from] debugger::DebugParseError),
+    #[error("Invalid system call: {0}")]
+    InvalidSyscall(u32)
 }
 
 #[cfg(test)]
