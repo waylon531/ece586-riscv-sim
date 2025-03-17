@@ -229,7 +229,7 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        // Why am I doing this crazy shit? To ensure we only print terminal control characters if the output is a terminal.
+        // Why am I doing this crazy nonsense? To ensure we only print terminal control characters if the output is a terminal.
         if environment::which_new_line() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
         write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
