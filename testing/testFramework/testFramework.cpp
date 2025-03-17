@@ -10,11 +10,32 @@
 
 testFramework::testFramework()
 {
-
+    
 }
 
 testFramework::testFramework(std::string simBinaryLocation, std::string rootPath, std::string testName, std::string instrType)
 {
+    m_testName = testName;
+    m_instrType = instrType;
+    m_simBinaryLocation = simBinaryLocation;
+    m_rootPath = rootPath;
+
+    m_simResultFilename = m_rootPath + "testing/" + m_instrType + "/testResources/results/" + m_testName + ".txt";
+    m_expectedResultFilename = m_rootPath + "testing/" + m_instrType +"/testResources/expected/" + m_testName + ".txt";
+    m_memImageLocation = rootPath + "testing/" + m_instrType + "/testResources/memImages/" + m_testName + ".mem";
+    m_assemblyFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".s";
+    m_objFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".out";
+    m_disassemblyFileLocation = rootPath + "testing/" + m_instrType + "/testResources/assembly/" + m_testName + ".dis";
+
+    generateMemImage();
+}
+
+testFramework::testFramework(std::string testName, std::string instrType)
+{
+    const std::string homedir = std::getenv("HOME");
+    const std::string simBinaryLocation = homedir + "/ece586-riscv-sim/target/release/ece586-riscv-sim";
+    const std::string rootPath = homedir + "/ece586-riscv-sim/";
+
     m_testName = testName;
     m_instrType = instrType;
     m_simBinaryLocation = simBinaryLocation;
@@ -51,7 +72,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = m_simBinaryLocation + " "+ m_memImageLocation + " --dump-to " + m_simResultFilename;
+    std::string cmd = m_simBinaryLocation + " "+ m_memImageLocation + " --dump-to " + m_simResultFilename + " --quiet -s 65536";
     system(cmd.c_str());
     parseResult();
     return pass;
@@ -177,7 +198,6 @@ std::string testFramework::getPath(std::string fileName)
     std::smatch match;
     if(std::regex_search(pathEnv, match, pattern))
     {
-        std::cout<<"match: "<<match[1]<<std::endl;
         dir = match[1];
     }
 
