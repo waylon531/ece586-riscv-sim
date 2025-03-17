@@ -49,6 +49,7 @@ impl Environment {
         self.timer = Instant::now();
     }
     pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
+
         let mut read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
         let mut read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
         match a7 {
