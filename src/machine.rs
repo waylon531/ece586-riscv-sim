@@ -229,7 +229,7 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        // Why am I doing this crazy shit? To ensure we only print terminal control characters if the output is a terminal.
+        // Why am I doing this crazy nonsense? To ensure we only print terminal control characters if the output is a terminal.
         if environment::which_new_line() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
         write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
@@ -582,6 +582,85 @@ impl Machine {
             // and they are effectively NOPs
             // Same with FENCE
             HINT | FENCE => {}
+
+            /* Multiplication / Division */ 
+            MUL(rd, rs1, rs2) => {
+                self.set_reg(
+                    rd,
+                    ((self.registers[rs1] as i32) * (self.registers[rs2] as i32)) as u32,
+                )
+            },
+            MULH(rd, rs1, rs2) => {
+                let res: i64 = (self.registers[rs1] as i64) * (self.registers[rs2] as i64) as i64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            MULSU(rd, rs1, rs2) => {
+                let res: i64 = (self.registers[rs1] as i64) * (self.registers[rs2] as u64) as i64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            MULU(rd, rs1, rs2) => {
+                let res: u64 = (self.registers[rs1] as u64) * (self.registers[rs2] as u64) as u64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            DIV(rd, rs1, rs2) => {
+                let res:i32 = 0;
+                if self.registers[rs2] == 0 {
+                    let res = (0 - 1) as i32;
+                } else {
+                    let res:i32 = (self.registers[rs1] as i32) / (self.registers[rs2] as i32);
+                }
+                self.set_reg(
+                    rd,
+                    res as u32
+                )
+            },
+            DIVU(rd, rs1, rs2) => {
+                let res = 0;
+                if self.registers[rs2] == 0 {
+                    let res = (0 - 1) as i32;
+                } else {
+                    let res:u32 = (self.registers[rs1] as u32) / (self.registers[rs2] as u32);
+                }
+                self.set_reg(
+                    rd,
+                    res
+                )
+            },
+            REM(rd, rs1, rs2) => {
+                let res: i32 = 0;
+                if self.registers[rs2] == 0 {
+                    let res: i32 = self.registers[rs1].clone() as i32;
+                } else {
+                    let res:i32 = (self.registers[rs1] as i32)  % (self.registers[rs2] as i32);
+                }
+                self.set_reg(
+                    rd,
+                    res as u32
+                )
+            },
+            REMU(rd, rs1, rs2) => {
+                let res = 0;
+                if self.registers[rs2] == 0 {
+                    let res = (0 - 1) as u32;
+                } else {
+                    let res:u32 = (self.registers[rs1] as u32) % (self.registers[rs2] as u32);
+                }
+                self.set_reg(
+                    rd,
+                    res
+                )
+            },
+
+
         }
 
         if increment_pc {
