@@ -83,6 +83,19 @@ pub enum Operation {
     // Generic performance hint, we don't need to store any information for them
     // and they are effectively NOPs
     HINT,
+
+    // Multiplication and division extensions
+
+    MUL(Register, Register, Register),
+    MULH(Register, Register, Register),
+    MULSU(Register, Register, Register),
+    MULU(Register, Register, Register),
+    DIV(Register, Register, Register),
+    DIVU(Register, Register, Register),
+    REM(Register, Register, Register),
+    REMU(Register, Register, Register),
+    
+       
 }
 
 impl Operation {
@@ -101,7 +114,7 @@ impl Operation {
                 opcode,
             }) => {
                 match opcode {
-                    0b0110011 => {
+                    0b0110011 | 0b0110011 => {
                         // This can be ADD, SUB, SLL, SLT, SLTU, XOR
                         match (funct3, funct7) {
                             (0, 0) => ADD(rd, rs1, rs2),
@@ -114,6 +127,14 @@ impl Operation {
                             (0b101, 0b0100000) => SRA(rd, rs1, rs2),
                             (0b110, 0) => OR(rd, rs1, rs2),
                             (0b111, 0) => AND(rd, rs1, rs2),
+                            (0b000,0b0100000) => MUL(rd,rs1,rs2),
+                            (0b001,0b0100000) => MULH(rd,rs1,rs2),
+                            (0b010,0b0100000) => MULSU(rd,rs1,rs2),
+                            (0b011,0b0100000) => MULU(rd,rs1,rs2),
+                            (0b100,0b0100000) => DIV(rd,rs1,rs2),
+                            (0b101,0b0100000) => DIVU(rd,rs1,rs2),
+                            (0b110,0b0100000) => REM(rd,rs1,rs2),
+                            (0b111,0b0100000) => REM(rd,rs1,rs2),
                             _ => return Err(ParseError::InvalidInstruction(combined)),
                         }
                     }
@@ -285,6 +306,23 @@ impl fmt::Display for Operation {
                 write!(f,"SUB   {r1}, {r2}, {r3}"),
             SRA(r1, r2, r3) => 
                 write!(f,"SRA   {r1}, {r2}, {r3}"),
+            MUL(r1, r2, r3) => 
+                write!(f,"MUL   {r1}, {r2}, {r3}"),
+            MULH(r1, r2, r3) => 
+                write!(f,"MULH   {r1}, {r2}, {r3}"),
+            MULSU(r1, r2, r3) => 
+                write!(f,"MULSU   {r1}, {r2}, {r3}"),
+            MULU(r1, r2, r3) => 
+                write!(f,"MULU   {r1}, {r2}, {r3}"),
+            DIV(r1, r2, r3) => 
+                write!(f,"DIV   {r1}, {r2}, {r3}"),
+            DIVU(r1, r2, r3) => 
+                write!(f,"DIVU   {r1}, {r2}, {r3}"),
+            REM(r1, r2, r3) => 
+                write!(f,"REM   {r1}, {r2}, {r3}"),
+            REMU(r1, r2, r3) => 
+                write!(f,"REMU   {r1}, {r2}, {r3}"),
+            
 
             // Control transfer instructions
             // Normal, unconditional jumps use x0 as the register
@@ -326,6 +364,8 @@ impl fmt::Display for Operation {
                 write!(f,"SH    {r1}, {r2}, {imm:#x}"),
             SB(r1, r2, imm) => 
                 write!(f,"SB    {r1}, {r2}, {imm:#x}"),
+
+            
 
             _ => write!(f, "{:?}", self)
 
