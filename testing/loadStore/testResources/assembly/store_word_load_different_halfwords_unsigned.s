@@ -9,14 +9,13 @@ ori t0, t0, 0x11
 # rotate it left
 slli t0, t0, 8
 # or in third byte
-ori t0, t0, 0xAE
+ori t0, t0, 0x7E
 # rotate it left
 slli t0, t0, 8
 # or in forth byte
 ori t0, t0, 0x89
 sw t0, -4(fp) # store what is at $t0 relative to the fp
-lbu t0, -1(fp)
-lbu t1, -2(fp)
-lbu t2, -3(fp)
-lbu t3, -4(fp)
+lhu t1, -2(fp)
+lhu t2, -3(fp)
+lhu t3, -4(fp)
 jalr ra

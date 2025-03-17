@@ -14,9 +14,6 @@ ori t0, t0, 0xAE
 slli t0, t0, 8
 # or in forth byte
 ori t0, t0, 0x89
-sw t0, -4(fp) # store what is at $t0 relative to the fp
-lbu t0, -1(fp)
-lbu t1, -2(fp)
-lbu t2, -3(fp)
-lbu t3, -4(fp)
+sw t0, -3(fp) # this should cause an exception
+lw t1, -3(fp)
 jalr ra

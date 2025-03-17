@@ -72,7 +72,7 @@ testFramework::~testFramework()
 
 bool testFramework::run()
 {
-    std::string cmd = m_simBinaryLocation + " "+ m_memImageLocation + " --dump-to " + m_simResultFilename;
+    std::string cmd = m_simBinaryLocation + " "+ m_memImageLocation + " --dump-to " + m_simResultFilename + " --quiet -s 65536";
     system(cmd.c_str());
     parseResult();
     return pass;
@@ -198,7 +198,6 @@ std::string testFramework::getPath(std::string fileName)
     std::smatch match;
     if(std::regex_search(pathEnv, match, pattern))
     {
-        std::cout<<"match: "<<match[1]<<std::endl;
         dir = match[1];
     }
 
