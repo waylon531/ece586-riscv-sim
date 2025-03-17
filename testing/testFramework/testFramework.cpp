@@ -120,8 +120,8 @@ void testFramework::parseResult()
 
 void testFramework::generateMemImage()
 {
-    m_assemblerPath = getPath("(?:^|:)([^:]*riscv64-[^:]*-as)(?=:|$)");
-    m_objdumpPath = getPath("(?:^|:)([^:]*riscv64-[^:]*-objdump)(?=:|$)");
+    m_assemblerPath = "riscv64-unknown-elf-as";
+    m_objdumpPath = "riscv64-unknown-elf-objdump";
     std::string assemblyCmd = m_assemblerPath + " -march=rv32i -mabi=ilp32 " + m_assemblyFileLocation + " -o " + m_objFileLocation;
     std::string disassemblyCmd = m_objdumpPath + " -d " + m_objFileLocation + " > " + m_disassemblyFileLocation;
 
