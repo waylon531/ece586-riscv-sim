@@ -7,6 +7,7 @@ mod register;
 mod webui;
 
 use machine::{ExecutionError, Machine};
+use devices::DeviceConfig;
 
 use termion::raw::IntoRawMode;
 use thiserror::Error;
@@ -97,6 +98,23 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         cli.memory_top as usize
     };
 
+    // Initialize extra hw devices
+    let mut devices = Vec::new();
+    for device_str in cli.device {
+        match DeviceConfig::from_str(&device_str) {
+            Ok(config) => match config.into_device() {
+                Ok(device) => devices.push(device),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return Ok(ExitCode::FAILURE);
+                },
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    }
     // Check to make sure we can open dump_to and overwrite it
     // In case of a crash this file will then be empty
     let dump_to = match cli.dump_to {
