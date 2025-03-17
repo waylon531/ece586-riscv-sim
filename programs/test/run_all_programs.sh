@@ -2,7 +2,7 @@
 
 FAILURES=0
 
-for program in programs/*.mem; do
+for program in programs/test/*.mem; do
     echo "--------------------"
     echo "Running $program"
     cargo run -- --suppress-status "$program"

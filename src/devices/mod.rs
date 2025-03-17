@@ -53,7 +53,7 @@ pub trait ByteDevice {
     /// Store a byte in the device
     fn store_byte(&self, addr: u32, data: u8) -> Result<(),Box<dyn Error>>;
     /// The memory range associated with a device
-    fn memory_range(&self) -> ops::Range<u32>;
+    fn memory_range(&self) -> ops::RangeInclusive<u32>;
 }
 pub trait HalfwordDevice {
     /// Read a 16-bit halfword from the device
@@ -61,7 +61,7 @@ pub trait HalfwordDevice {
     /// Store a 16-bit halfword in the device
     fn store_halfword(&self, addr: u32, data: u16) -> Result<(),Box<dyn Error>>;
     /// The memory range associated with a device
-    fn memory_range(&self) -> ops::Range<u32>;
+    fn memory_range(&self) -> ops::RangeInclusive<u32>;
 }
 pub trait WordDevice {
     /// Read a 32-bit word from the device
@@ -69,7 +69,7 @@ pub trait WordDevice {
     /// Store a 32-bit word in the device
     fn store_word(&self, addr: u32, data: u32) -> Result<(),Box<dyn Error>>;
     /// The memory range associated with a device
-    fn memory_range(&self) -> ops::Range<u32>;
+    fn memory_range(&self) -> ops::RangeInclusive<u32>;
 }
 
 pub trait Device {
@@ -86,7 +86,7 @@ pub trait Device {
     /// Store a 32-bit word in the device
     fn store_word(&self, addr: u32, data: u32) -> Result<(),Box<dyn Error>>;
     /// The memory range associated with a device
-    fn memory_range(&self) -> ops::Range<u32>;
+    fn memory_range(&self) -> ops::RangeInclusive<u32>;
 }
 // This impl lets you read and write entire words to a device without having to
 // manually implement these methods
@@ -127,7 +127,7 @@ impl<T: ByteDevice> Device for T {
         Ok(())
     }
     /// The memory range associated with a device
-    fn memory_range(&self) -> ops::Range<u32> {
+    fn memory_range(&self) -> ops::RangeInclusive<u32> {
         self.memory_range()
     }
     

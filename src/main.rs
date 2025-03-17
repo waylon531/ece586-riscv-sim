@@ -139,6 +139,7 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         cli.stack_addr,
         cli.memory_top,
         mmap.into_boxed_slice(),
+        devices
     );
 
     // Run the machine to completion

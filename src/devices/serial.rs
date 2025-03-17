@@ -3,7 +3,7 @@ use super::{DeviceConfigError,ByteDevice};
 use std::collections::{HashMap,VecDeque};
 use std::error;
 use std::io::{Read,Write};
-use std::ops::Range;
+use std::ops::RangeInclusive;
 use std::sync::{Arc,Mutex};
 use std::sync::mpsc::{channel,Sender,SendError};
 use std::thread::{JoinHandle,self};
@@ -69,14 +69,26 @@ impl PTYBackend {
         // This thread lets us do nonblocking writes and reads
         let write_thread = thread::spawn(move || {
             for byte in reader.iter() {
-                // Crash if something goes wrong, no better way to handle errors from child threads
-                // yet
-                port.write(&[byte]).expect("Failed to write to TTY, panicking");
+                // Loop forever until the byte is successfully written
+                loop {
+                    match port.write(&[byte]) {
+                        Ok(1) => break,
+                        Ok(_) => continue,
+                        Err(_) => continue,
+                    }
+
+                }//.expect("Failed to write to TTY, panicking");
             }
         });
         let read_thread = thread::spawn(move || {
             for byte in port_reader.bytes() {
-                let byte = byte.expect("Unable to read from PTY, panicking");
+                let byte = match byte {
+                    Ok(b) => b,
+                    // It's cursed, but reads will not block and will instantly error out
+                    // if noone is connected to the slave port. This silently throws away 
+                    // the error.
+                    Err(_) => continue
+                };
                 read_buffer.lock().expect("PTY reader poisoned").push_back(byte);
             }
 
@@ -121,8 +133,8 @@ impl Serial {
 
 }
 impl ByteDevice for Serial {
-    fn memory_range(&self) -> Range<u32> {
-        self.base_address .. (self.base_address + 8)
+    fn memory_range(&self) -> RangeInclusive<u32> {
+        self.base_address ..= (self.base_address + 8)
 
     }
     fn store_byte(&self, addr: u32, data: u8) -> Result<(),Box<dyn error::Error>> {
@@ -148,7 +160,7 @@ impl ByteDevice for Serial {
             } else {
                 0
             };
-            Ok(1 << 5 & can_read)
+            Ok(1 << 5 | can_read)
         } else if offset == 0 {
             let deque = &mut self.read_buffer.lock().map_err(|_| SerialError::ThreadPoisonError)?;
             // If there is no data in the buffer then return dummy data
@@ -170,5 +182,4 @@ pub enum SerialError {
     ThreadSendError(#[from] SendError<u8>),
     #[error("Child thread panicked")]
     ThreadPoisonError,
-
 }
