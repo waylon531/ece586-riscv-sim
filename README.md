@@ -30,6 +30,7 @@ Planned devices are:
 ## Supported Extensions
 
 - RV32I
+- M
 
 ## USAGE
 ```

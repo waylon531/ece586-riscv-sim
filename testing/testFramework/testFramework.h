@@ -15,13 +15,14 @@ class testFramework
          * @param is the instructionType, the overal category folder it resides under
         */
         testFramework(std::string simBinaryLocation, std::string rootPath, std::string testName, std::string instrType);
+        testFramework(std::string testName, std::string instrType);
         /**
          * @brief deconstructor, cleans up the files created during the test
         */
         ~testFramework();
 
         bool run();
-    
+
     private:
         /**
          * @brief compare line by line through the simResult and expectedResult

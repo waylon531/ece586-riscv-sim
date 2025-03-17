@@ -5,6 +5,8 @@ mod machine;
 mod opcode;
 mod register;
 mod webui;
+mod statetransfer;
+mod environment;
 
 use machine::{ExecutionError, Machine};
 use devices::DeviceConfig;
@@ -14,10 +16,14 @@ use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{stdout, stdin, Write, BufReader, BufRead};
+use std::io::{stdout, stdin, Write, BufReader, BufRead, IsTerminal};
 use std::num;
 use std::process::ExitCode;
 use std::thread;
+
+use single_value_channel::{channel_starting_with,Updater as SvcSender};
+use crossbeam_channel::{unbounded,Receiver as CbReceiver, Sender as CbSender};
+
 
 #[derive(ValueEnum, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
@@ -66,20 +72,36 @@ struct Cli {
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
+    if (cli.single_step && ! stdout().is_terminal()) {
+        println!("Cannot enter interactive mode when stdout is not a terminal.");
+        return Ok(ExitCode::FAILURE);
+    }
     // if we're not running the web ui
     if !cli.web_ui {
         // just launch into the simulator
-        return run_simulator(cli);
+        return run_simulator(cli, None, None);
     }
     // otherwise, run simulator and web server in separate threads
+    
+    // Create an unbounded channel for control messages from the web UI to the machine
+    /* 
+    
+    TODO: create data type for machine state and commands
+    
+     */
+    let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
+    
+    // Create a channel to send the machine state through to the web UI 
+    let (mut state_rx, state_tx) = channel_starting_with(0);
+    
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable
-        let simulator_thread = thread::spawn(move || {
-            run_simulator(cli_for_simulator).unwrap();
+        let _ = thread::spawn(move || {
+            run_simulator(cli_for_simulator, Some(commands_rx), Some(state_tx)).unwrap();
         });
     });
     let web_server_thread = thread::spawn(|| {
-        webui::run_server();
+        webui::run_server(commands_tx, state_rx);
     });
     web_server_thread.join().unwrap();
     simulator_thread.join().unwrap();
@@ -87,9 +109,10 @@ fn main() -> std::io::Result<ExitCode> {
     return Ok(ExitCode::from(0));
 }
 
-fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
+fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
     // Set up input and output
-    let mut stdout = stdout().into_raw_mode().unwrap();
+    
+    
     let stdin = stdin();
 
     let capacity = if cli.memory_top == 0 {
@@ -143,7 +166,7 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
     );
 
     // Run the machine to completion
-    let result = machine.run(cli.single_step, &stdin, &mut stdout);
+    let result = machine.run(cli.single_step, &stdin, commands_rx,state_tx);
 
     let mut error_message = None;
 
@@ -170,12 +193,16 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
 
     // Print the registers one last time
     if !cli.quiet {
-        write!(stdout,"{}",termion::clear::All)?;
-        write!(stdout,"{}",machine.display_info())?;
+
+        environment::clear_term();
+        environment::write_stdout(&machine.display_info());
+
     }
 
     if let Some(err) = error_message {
-        write!(stdout,"\r\n{}\r\n",err)?;
+        environment::write_newline();
+        environment::write_stdout(&err);
+        environment::write_newline();
     }
 
     // Exit
