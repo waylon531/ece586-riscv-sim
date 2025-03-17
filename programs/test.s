@@ -10,3 +10,4 @@ la a1, msg
 la a2, 12
 li a7, 64
 ecall
+jr ra

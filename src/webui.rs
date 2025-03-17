@@ -19,13 +19,13 @@ static STATE_RX: LazyLock<Mutex<Option<SvcReceiver<i32>>>> = LazyLock::new(|| Mu
 fn get_assets(req: Request) -> Response {
     let wildcard = req.get_wildcard().unwrap();
     let (code, mime_type, file): (u16, &str, &[u8]) = match wildcard.as_str() {
-        "/css/bootstrap.min.css"    => (200, "text/css", include_bytes!("webui/css/bootstrap.min.css")),
-        "/css/codemirror.css"    => (200, "text/css", include_bytes!("webui/css/codemirror.css")),
-        "/css/extra.css"    => (200, "text/css", include_bytes!("webui/css/extra.css")),
-        "/js/bootstrap.min.js"    => (200, "text/javascript", include_bytes!("webui/js/bootstrap.min.js")),
-        "/js/codemirror.js"    => (200, "text/javascript", include_bytes!("webui/js/codemirror.js")),
-        "/js/extra.js"    => (200, "text/javascript", include_bytes!("webui/js/extra.js")),
-        "/"             => (200, "text/html", include_bytes!("webui/index.html")),
+        "/css/bootstrap.min.css"    => (200, "text/css", include_bytes!("webui_static/css/bootstrap.min.css")),
+        "/css/codemirror.css"    => (200, "text/css", include_bytes!("webui_static/css/codemirror.css")),
+        "/css/extra.css"    => (200, "text/css", include_bytes!("webui_static/css/extra.css")),
+        "/js/bootstrap.min.js"    => (200, "text/javascript", include_bytes!("webui_static/js/bootstrap.min.js")),
+        "/js/codemirror.js"    => (200, "text/javascript", include_bytes!("webui_static/js/codemirror.js")),
+        "/js/extra.js"    => (200, "text/javascript", include_bytes!("webui_static/js/extra.js")),
+        "/"             => (200, "text/html", include_bytes!("webui_static/index.html")),
         _               => (404, "text/plain", b"404"),
     };
 

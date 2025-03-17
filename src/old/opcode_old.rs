@@ -1,5 +1,5 @@
 use crate::decode::{bytes_to_u32, InstructionType, ParseError, bitrange};
-use crate::register::Register;
+use crate::regfile::Register;
 
 use std::fmt;
 

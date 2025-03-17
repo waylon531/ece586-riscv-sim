@@ -43,7 +43,9 @@ pub enum InstructionType {
     },
 }
 
+
 impl InstructionType {
+
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         // opcode is 7 bits
         let opcode = bytes[0] & 0x7F;
@@ -133,17 +135,7 @@ pub fn bitrange(num: u32, start: usize, end: usize) -> u32 {
     (num >> start) & ((1 << (1 + end - start)) - 1)
 }
 
-#[derive(Error, Debug, PartialEq)]
-pub enum ParseError {
-    #[error("Invalid register: {0}")]
-    RegisterDecode(u32),
-    #[error("Invalid instruction: {0:#x}")]
-    InvalidInstruction(u32),
-    #[error("Invalid opcode: {0:#x}")]
-    InvalidOpcode(u8),
-    #[error("Invalid format: {0:#x}")] // not sure if correct formatting
-    InvalidFormat(u32),
-}
+
 
 #[cfg(test)]
 mod tests {

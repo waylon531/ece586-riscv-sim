@@ -1,11 +1,8 @@
-mod debugger;
-mod decode;
+mod environment;
 mod machine;
-mod opcode;
-mod register;
 mod webui;
 mod statetransfer;
-mod environment;
+mod debugger;
 
 use machine::{ExecutionError, Machine};
 
@@ -29,6 +26,8 @@ enum DumpFmt {
     JSON,
     Txt,
 }
+
+//    Get command line arguments
 
 // TODO: memory top maybe could be a string? For 1GB? Etc
 #[derive(Parser)]
@@ -69,24 +68,14 @@ fn main() -> std::io::Result<ExitCode> {
         println!("Cannot enter interactive mode when stdout is not a terminal.");
         return Ok(ExitCode::FAILURE);
     }
-    // if we're not running the web ui
+    // if we're not running the web ui, just launch into the simulator. otherwise, we will create the simulator and web server as two threads.
     if !cli.web_ui {
-        // just launch into the simulator
         return run_simulator(cli, None, None);
     }
-    // otherwise, run simulator and web server in separate threads
     
-    // Create an unbounded channel for control messages from the web UI to the machine
-    /* 
     
-    TODO: create data type for machine state and commands
-    
-     */
     let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
-    
-    // Create a channel to send the machine state through to the web UI 
     let (mut state_rx, state_tx) = channel_starting_with(0);
-    
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable
         let _ = thread::spawn(move || {
@@ -103,9 +92,7 @@ fn main() -> std::io::Result<ExitCode> {
 }
 
 fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
-    // Set up input and output
-    
-    
+   
     let stdin = stdin();
 
     let capacity = if cli.memory_top == 0 {
@@ -121,8 +108,8 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
         None => None,
     };
 
+    // Load program into memory buffer
     let mut mmap = vec![0; capacity];
-
     // TODO: set up machine mmap in a real way instead of this jank
     match parse_file(&mut mmap, &cli.filename) {
         Ok(()) => {}
@@ -133,6 +120,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
         }
     }
 
+    // Instantiate machine using buffer
     let mut machine = Machine::new(
         cli.starting_addr,
         cli.stack_addr,
@@ -156,6 +144,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     };
 
     // Either run the machine in single-step mode or all at once
+
     // Handle all cleanup/finishing actions
     if let Some(mut file) = dump_to {
         let bytes = match cli.dump_fmt {
@@ -192,6 +181,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
 
 
 fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(), ReadFileError> {
+    /* TODO: Comment this */
     let f = File::open(filename)?;
     let reader = BufReader::new(f);
     for line in reader.lines() {

@@ -1,4 +1,4 @@
-use crate::register::Register;
+use crate::regfile::Register;
 use crate::machine::{Machine,ExecutionError};
 use thiserror::Error;
 use std::str::FromStr;

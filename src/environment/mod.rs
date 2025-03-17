@@ -48,17 +48,17 @@ impl Environment {
     pub fn reset_timer(&mut self) -> () {
         self.timer = Instant::now();
     }
-    pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
+    pub fn syscall(&mut self, syscall_number: u32, argv: [u32;6], memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
 
         let mut read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
         let mut read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
-        match a7 {
+        match syscall_number {
             // open(char* pathname, int flags)
             // a0: pathname, a1: flags
             // returns file descriptor to a0, or -1 if failed 
             56 => {
-                let filename = read_string(a0);
-                Ok(self.fdtable.open(&filename, a1).unwrap_or_else(|_|{
+                let filename = read_string(argv[0]);
+                Ok(self.fdtable.open(&filename, argv[1]).unwrap_or_else(|_|{
                     eprintln!("ENVIRONMENT: Failed to open file: {}",str::from_utf8(&filename).unwrap_or("[garbled nonsense]"));
                     -1
                 }))
@@ -93,7 +93,7 @@ impl Environment {
             },
             // sleep
             77 => {
-                std::thread::sleep(std::time::Duration::from_millis(a0 as u64));
+                std::thread::sleep(std::time::Duration::from_millis(argv[0] as u64));
                 Ok(0)
             },
             // return time elapsed
@@ -102,9 +102,9 @@ impl Environment {
             }
             // exit
             94 => {
-                std::process::exit(a0 as i32);
+                std::process::exit(argv[0] as i32);
             },
-            _ => { Err(ExecutionError::InvalidSyscall(a7)) }
+            _ => { Err(ExecutionError::InvalidSyscall(syscall_number)) }
         }
     }
 }
