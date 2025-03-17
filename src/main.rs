@@ -1,5 +1,6 @@
 mod debugger;
 mod decode;
+mod devices;
 mod machine;
 mod opcode;
 mod register;
@@ -8,6 +9,7 @@ mod statetransfer;
 mod environment;
 
 use machine::{ExecutionError, Machine};
+use devices::DeviceConfig;
 
 use termion::raw::IntoRawMode;
 use thiserror::Error;
@@ -61,6 +63,11 @@ struct Cli {
     /// Suppress exit code returned from emulated program
     #[arg(long)]
     suppress_status: bool,
+
+    // These have to be parsed later, clap isnt smart enough to parse them
+    /// Enable a specific device. Format is `--device NAME,opt=foo,opt2=foo2`.
+    #[arg(long)]
+    device: Vec<String>
 }
 
 fn main() -> std::io::Result<ExitCode> {
@@ -114,6 +121,23 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
         cli.memory_top as usize
     };
 
+    // Initialize extra hw devices
+    let mut devices = Vec::new();
+    for device_str in cli.device {
+        match DeviceConfig::from_str(&device_str) {
+            Ok(config) => match config.into_device() {
+                Ok(device) => devices.push(device),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return Ok(ExitCode::FAILURE);
+                },
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    }
     // Check to make sure we can open dump_to and overwrite it
     // In case of a crash this file will then be empty
     let dump_to = match cli.dump_to {
@@ -138,6 +162,7 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
         cli.stack_addr,
         cli.memory_top,
         mmap.into_boxed_slice(),
+        devices
     );
 
     // Run the machine to completion
