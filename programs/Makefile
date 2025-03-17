@@ -6,7 +6,7 @@ RVSTRIP:=riscv64-unknown-elf-strip
 CFLAGS:=-fpic -march=rv32i -mabi=ilp32
 LIBS:=-lgcc
 LDFLAGS:=$(CFLAGS) -Wl,--gc-sections -nostdlib  -Wl,--strip-all
-TARGETS:=call_subroutine.mem simple_test_mem.mem test_mem.mem
+TARGETS:=test/call_subroutine.mem test/simple_test_mem.mem test/test_mem.mem test/lbu_test.mem
 
 all: $(TARGETS)
 
