@@ -4,6 +4,8 @@ use crate::devices::Device;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
 use core::time;
@@ -85,7 +87,16 @@ impl Machine {
 
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
-        let mut should_trigger_cmd = single_step;
+        //let mut should_trigger_cmd = single_step;
+        //Ctrl-C should trigger the cmd
+        //NOTE: Lots of places I am doing SeqCst ordering, the most restrictive ordering, this
+        //needs a pass at some point to determine if its necessary or not.
+        let should_trigger_cmd = Arc::new(AtomicBool::new(single_step));
+        let trigger_clone = should_trigger_cmd.clone();
+        ctrlc::set_handler(move || {
+            trigger_clone.store(true, Ordering::Relaxed);
+        }).expect("Error setting Ctrl-C handler");
+
         let mut rl = rustyline::DefaultEditor::new()?;
         // Set the default command to step, by default
         let mut last_cmd = DebugCommand::STEP(1);
@@ -104,14 +115,14 @@ impl Machine {
             // Otherwise decrement the step counter
             if let Some(count) = should_step {
                 if count <= 1 {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     should_step = None;
                 } else {
                     should_step = Some(count-1);
                 }
             };
 
-            if should_trigger_cmd {
+            if should_trigger_cmd.load(Ordering::SeqCst) {
                 // print debug state
                 environment::clear_term();
                 environment::write_stdout(&self.display_info());
@@ -126,24 +137,7 @@ impl Machine {
                     let mut new_status = cmd.execute(
                         self,
                         &mut should_step, 
-                        &mut should_trigger_cmd,
-                        &mut dummy_run,
-                        &mut dummy_watchlist
-                        )?;
-                    for line in new_status.drain(..) {
-                        status.push(line);
-                    }
-                }
-
-                // handle all watchlist lines
-                // this is way hackier than I thought ...
-                for cmd in watchlist.iter() {
-                    let mut dummy_run = false;
-                    let mut dummy_watchlist = Vec::new();
-                    let mut new_status = cmd.execute(
-                        self,
-                        &mut should_step, 
-                        &mut should_trigger_cmd,
+                        &mut false,
                         &mut dummy_run,
                         &mut dummy_watchlist
                         )?;
@@ -190,13 +184,15 @@ impl Machine {
 
                 let mut run = false;
                 
+                let mut value = should_trigger_cmd.load(Ordering::SeqCst);
                 let mut new_status = command.execute(
                     self,
                     &mut should_step, 
-                    &mut should_trigger_cmd,
+                    &mut value,
                     &mut run,
                     &mut watchlist
                     )?;
+                should_trigger_cmd.store(value,Ordering::SeqCst);
 
 
                 // Combine vecs
@@ -220,7 +216,7 @@ impl Machine {
                 // Should errors bail? Or bring up the debugger to explore program state?
                 // Bail for now probably, its easier (though worse)
                 Err(e@ ExecutionError::Breakpoint(_)) => {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     // Give a pass so the next step of execution can make it past the breakpoint
                     self.pass_breakpoint = true;
                     status.push(format!("{}",e));
