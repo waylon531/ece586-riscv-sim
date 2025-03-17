@@ -594,7 +594,7 @@ impl Machine {
                 let res: i64 = (self.registers[rs1] as i64) * (self.registers[rs2] as i64) as i64;
                 self.set_reg(
                     rd,
-                    (res as u32 >> 32),
+                    (res >> 32) as u32,
                 )
             },
             MULSU(rd, rs1, rs2) => {
