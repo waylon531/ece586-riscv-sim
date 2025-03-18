@@ -4,15 +4,15 @@ enum control_code {
   STOP,
   STEP,
   RESET,
-  LOAD,
-  POKE,
+  LOAD {
+    file: String,
+  },
+  POKE {
+    
+  },
   POKEREG,
   SETBREAK,
   WATCH,
   WATCHREG,
   JMP
-}
-struct control_cmd {
-  
-
 }
