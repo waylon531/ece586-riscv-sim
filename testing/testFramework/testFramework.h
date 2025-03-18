@@ -37,6 +37,7 @@ class testFramework
          * @param fileName is a regex pattern for the file you want to find in your $PATH
         */
         std::string getPath(std::string fileName);
+        std::string findInFolder(std::string folderPath, std::string regEx);
         std::string m_testName;
         bool pass = false;
 
