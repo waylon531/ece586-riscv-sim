@@ -6,7 +6,6 @@ use crate::register::Register;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use proptest::collection::vec;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
@@ -56,7 +55,7 @@ pub struct Machine {
     #[serde(skip_serializing)]
     devices: Vec<Device>,
     #[serde(skip_serializing)]
-    env: Environment
+    env: Environment,
 }
 impl Machine {
     pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>,verbose:bool,devices:Vec<Device>) -> Self{
@@ -74,8 +73,7 @@ impl Machine {
                     web_runfullspeed: true,
                     web_step: false,
                     verbose: verbose,
-                    cycle: 0,
-                    Devices:Vec::new()
+                    cycle: 0
                     
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
@@ -85,12 +83,12 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, _commands_rx: Option<CbReceiver<statetransfer::ControlCode>>, _state_tx: Option<SvcSender<statetransfer::MachineState>>) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<statetransfer::ControlCode>>, state_tx: Option<SvcSender<statetransfer::MachineState>>) -> Result<(),ExecutionError> {
         // reset timer
         self.env.reset_timer();
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
-        let mut should_trigger_cmd = single_step;
+        let should_trigger_cmd = Arc::new(AtomicBool::new(single_step));
         let mut rl = rustyline::DefaultEditor::new()?;
         // Set the default command to step, by default
         let mut last_cmd = DebugCommand::STEP(1);
@@ -817,7 +815,7 @@ mod tests {
 
     #[test]
     fn test_write_u32() {
-        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice(),false);
+        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice(),false,Vec::new());
         machine.store_word(0xBEE5AA11,0).unwrap();
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
