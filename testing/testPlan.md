@@ -34,23 +34,32 @@ jump instruction if the address is not aligned on a 4-byte boundary in memory. I
 _How does one execute and run the test cases?_
 
 There are tests in the source files that can be run using the `cargo test` command. These are also
-run automatically because `cargo test` is run as part of CI.
+run automatically because `cargo test` is run as part of CI. There are demos in
+the `programs/` folder that serve as tests as well, as larger integration tests.
+The most complex of these decodes a jpg image and displays it to a framebuffer.
 
 There are also some tests in `programs/` that use the exit code checking method: `ld_str.mem`’s
 expected return value is 42, and `simple_test_mem.mem` returns the difference between an expected and actual value as the exit code (so 0 indicates correctness). For these tests, there is a makefile (also in `programs/`) to compile/assemble them. The exit code of the emulator will be whatever was in `$a0`, so you can test based off of that. The `--dump-to FILE` option dumps program state at the end of execution and allows you to compare register values to expected values.
 There is also the option of using the `--suppress-status` flag, in which case 0 indicates success
-and 1 indicates that one or more exceptions occurred.
+and 1 indicates that one or more exceptions occurred. As a basic sanity test,
+all tests in `programs/` are compiled, ran, and checked for errors in CI.
 
 In addition to all this, there is a testing framework (on the feature branch `testFramework`), the
 tests for which can be run as follows:
 
-From top-level directory,
-`sudo apt install cmake` if you don’t already have it
+From the top-level directory,
+`sudo apt install cmake` if you don’t already have it.
+
 `cd testing`
+
 `cmake -S . -B build`
+
 `cmake --build build`
+
 `cd load`
+
 `./loadTest` will execute the entire test suite
+
 `./test_executable --gtest_filter=TestSuiteName.TestName` runs a single test
 
 Changes can be made to the assembly and expected results file without having to re-compile
@@ -70,64 +79,88 @@ by case analysis against their expected values.
 
 ## ADD
 Semantics: rd ← rs1 + rs2. Signed addition.
+
 Case analysis:
+
 - rs1 > 0 and rs2 > 0 ⇒ rd > rs1, rs2.
 - rs1 < 0 and rs2 < 0 ⇒ rd < rs1, rs2
 - rs1 > 0 and rs2 < 0 ⇒ rd < rs1
 - rs1 = 0 and rs2 = 0 ⇒ rd = 0
 - rs1 = 0 and rs2 != 0 ⇒ rd = rs2
+
 Things to check:
+
 - was addition implemented as signed addition
 - Did overflow mechanism behave correctly (returning the low 32 bits)
 
 ## SUB
 Semantics: rd ← rs1 - rs2. Signed subtraction.
+
 Case analysis:
+
 - rs1 > rs2 ⇒ rd > 0
 - rs1 = rs2 ⇒ rd = 0
 - rs1 < rs2 ⇒ rd < 0
+
 Things to check:
+
 - was subtraction implemented as signed subtraction
 
 ## AND
 Semantics: rd ← rs1 & rs2. Bitwise and.
+
 Case analysis:
+
 - rs1[0] = 1 and rs2[0] = 1 ⇒ rd[0] = 1
 - otherwise rd[0] = 0
 
 ## OR
 Semantics: rd ← rs1 | rs2. Bitwise or.
+
 Case analysis:
+
 - rs1[0] = 0 and rs2[0] = 0 ⇒ rd[0] = 0
 - otherwise rd[0] = 1
 
 ## XOR
 Semantics: rd ← rs1 ^ rs2. Bitwise exclusive or.
+
 Case analysis:
+
 - rs1[0] != rs2[0] ⇒ rd[0] = 1
 - otherwise rd[0] = 0
 
 ## SLL
 Semantics: rd ← rs1 <<logical rs2.
+
 Things to check:
+
 - value in rs2 should be positive
 - zero fill on the right
 
 ## SRL
+
 Semantics: rd ← rs1 >>logical rs2.
+
 Things to check:
+
 - value in rs2 should be positive
 - zero fill on the left
 
 ## SRA
 Semantics: rd ← rs1 >>arithmetic rs2.
+
 Things to check:
+
 - value in rs2 should be positive
 - fill with sign bit on the left
 
 ## SLT
+
 Semantics: rd ← 1 if rs1 < rs2 else 0. Signed comparison.
+
 Case analysis:
+
 - rs1 < rs2 ⇒ rd = 1
 - otherwise rd = 0
 Things to check:
@@ -135,6 +168,7 @@ Things to check:
 
 ## SLTU
 Semantics: same as above, except unsigned comparison.
+
 Case analysis/things to check for: same as above, except this time it is correct to have
 implemented an unsigned comparison.
 
@@ -142,37 +176,49 @@ implemented an unsigned comparison.
 
 ## ADDI
 Semantics: rd ← rs1 + sign-extend(imm12).
+
 Case analysis:
+
 - rs1 > 0 and imm12 > 0 ⇒ rd > rs1, imm12
 - rs1 < 0 and imm12 < 0 ⇒ rd < rs1, imm12
 - rs1 > 0 and imm12 < 0 ⇒ rd < rs1
 - rs1 = 0 and imm12 = 0 ⇒ rd = 0
 - rs1 = 0 and imm12 != 0 ⇒ rd = imm12
+
 Things to check:
+
 - was imm12 sign-extended
 - was addition implemented as signed
 
 ## ANDI
 Semantics: rd ← rs1 & sign-extend(imm12).
+
 Case analysis:
+
 - rs1[0] = 1 and imm12[0] = 1 ⇒ rd[0] = 1
 - otherwise rd[0] = 0
 
 ## ORI
 Semantics: rd ← rs1 | sign-extend(imm12).
+
 Case analysis:
+
 - rs1[0] = 0 and imm12[0] = 0 ⇒ rd[0] = 0
 - otherwise rd[0] = 1
 
 ## XORI
 Semantics: rd ← rs1 ^ sign-extend(imm12).
+
 Case analysis:
+
 - rs1[0] != imm12[0] ⇒ rd[0] = 1
 - otherwise rd[0] = 0
 
 ## SLLI
 Semantics: rd ← rs1 << logical imm12[4:0].
+
 Things to check:
+
 - value in imm12[4:0] should be positive
 - zero fill on the right
 - the implementation should not have sign-extended the immediate, as it is not being used
@@ -180,7 +226,9 @@ as a value but contains further encoding
 
 ## SRLI
 Semantics: rd ← rs1 >>logical imm12[4:0].
+
 Things to check:
+
 - value in imm12[4:0] should be positive
 - zero fill on the left
 - the implementation should not have sign-extended the immediate, as it is not being used
@@ -188,7 +236,9 @@ as a value but contains further encoding
 
 ## SRAI
 Semantics: rd ← rs1 >>arithmetic imm12[4:0].
+
 Things to check:
+
 - value in imm12[4:0] should be positive
 - the implementation should not have sign-extended the immediate, as it is not being used
 as a value but contains further encoding
@@ -196,15 +246,20 @@ as a value but contains further encoding
 
 ## SLTI
 Semantics: rd ← 1 if rs1 < imm12 else 0. Signed comparison.
+
 Case analysis:
+
 - rs1 < imm12 ⇒ rd = 1
 - otherwise rd = 0
+
 Things to check:
+
 - was comparison implemented as signed
 
 ## SLTIU
 Semantics: same as above, except unsigned comparison. Note that first the immediate is
 sign-extended, and the result is then treated as an unsigned value.
+
 Case analysis/things to check for: same as above, except this time it is correct to have
 implemented an unsigned comparison. And make sure the immediate was sign-extended
 despite this being an operation on unsigned values.
@@ -213,7 +268,9 @@ despite this being an operation on unsigned values.
 
 ## LUI
 Semantics: rd ← (imm20 << 12).
+
 Things to check: 
+
 - did the immediate get shifted by the proper amount
 - `R[rd] = {imm,12'b0}`
 - sign extending
@@ -222,7 +279,9 @@ Things to check:
 
 ## AUIPC
 Semantics: rd ← (imm20 << 12) + address(AUIPC)
+
 Things to check:
+
 - `R[rd] = PC + {imm, 12'b0}`
 - program counter should be in an expected state, run PC, probably just start at 
   0x0
@@ -234,35 +293,45 @@ Things to check:
 
 ## LW
 Semantics: 
+
 - val ← mem[rs1 + sign-extend(imm12)]32.
 - sign-extend(val)
 - rd ← val
+
 Things to check:
+
 - was immediate sign-extended
 - was val sign-extended
 - is memory address aligned correctly
 
 ## LH
 Semantics: 
+
 - val ← mem[rs1 + sign-extend(imm12)]16.
 - sign-extend(val)32
 - rd ← val
+
 Things to check:
+
 - was immediate sign-extended
 - was val sign-extended to 32 bits
 - is memory address aligned correctly
 
 ## LB
 Semantics: 
+
 - val ← mem[rs1 + sign-extend(imm12)]8.
 - sign-extend(val)32
 - rd ← val
+
 Things to check: same as LH above
 
 ## LHU
 Semantics: same as LH, except zero-extend the value to 32 bits before loading it (note that the
 immediate used as memory offset is still sign-extended!).
+
 Things to check:
+
 - were exactly 16 bits retrieved from memory
 - was immediate sign-extended (even though the result value will be unsigned!)
 - was value from memory zero-extended to 32 bits
@@ -270,24 +339,32 @@ Things to check:
 
 ## LBU
 Semantics: same as LHU, except value loaded is 8 bits instead of 16.
+
 Things to check: same as LHU, except 8 bits retrieved from memory.
 
 ## SW
 Semantics: mem[rs1 + sign-extend(imm12)] ← rs2.
+
 Things to check:
+
 - was immediate sign-extended
 - Is memory address aligned correctly
 
 ## SH
+
 Semantics: mem[rs1 + sign-extend(imm12)] ← rs2[15:0].
+
 Things to check:
+
 - was immediate sign-extended
 - Is memory address aligned correctly
 - are we storing the low 16 bytes of rs2
 
 ## SB
 Semantics: mem[rs1 + sign-extend(imm12)] ← rs2[15:0].
+
 Things to check:
+
 - was immediate sign-extended
 - Is memory address aligned correctly
 - are we storing the low 8 bytes of rs2
@@ -296,27 +373,37 @@ Things to check:
 
 ## BEQ
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BEQ)
 - if rs1 == rs2 then PC ← tgt 
 - else PC ← PC + 4
+
 Case analysis for comparison:
+
 - rs1 == rs2 (branch should be taken)
 - otherwise branch should not be taken
+
 Things to check:
+
 - was immediate sign-extended and shifted right by 1
 - did correct address get used as base
 
 ## BNE
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BNE)
 - if rs1 != rs2 then PC ← tgt else PC ← PC + 4
+
 Case analysis for comparison:
+
 - rs1 != rs2 (branch should be taken)
 - otherwise branch should not be taken
+
 Things to check: same as BEQ
 
 ## BLT
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BL T)
 - if rs1 < signed rs2 then PC ← tgt else PC ← PC + 4
 Case analysis for comparison, taking into account the common implementation error of confusing
@@ -333,6 +420,7 @@ large positive number, causing the comparison to evaluate to true.
 
 ## BLTU
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BL TU)
 - if rs1 < unsigned rs2 then PC ← tgt else PC ← PC + 4
 Case analysis for comparison, taking into account the common implementation error of confusing
@@ -349,6 +437,7 @@ negative number, causing the comparison to evaluate to true.
 
 ## BGE
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BGE)
 - if rs1 >= signed rs2 then PC ← tgt else PC ← PC + 4
 Case analysis for comparison, taking into account the common implementation error of confusing
@@ -364,6 +453,7 @@ large positive number, causing the comparison to evaluate to false.
 
 ## BLTU
 Semantics: 
+
 - tgt ← (sign-extend(imm12) << 1)32 + address(BLTU)
 - if rs1 >= unsigned rs2 then PC ← tgt else PC ← PC + 4
 Case analysis for comparison, taking into account the common implementation error of confusing
@@ -381,15 +471,21 @@ negative number, causing the comparison to evaluate to false.
 
 ## JAL
 Semantics: 
+
 - tgt ← (sign-extend(imm20) << 1)32 + address(JAL)
 - rd ← PC + 4
+
 Things to check:
+
 - did immediate get sign-extended and shifted left by one?
 - is target address aligned?
 
 ## JALR
+
 Semantics: 
+
 - tgt ← ((sign-extend(imm12) << 1)32 & 0 ) + address(JALR)
 - rd ← PC + 4
+
 Things to check: same as above, plus did the 32-bit value resulting from sign-extending the
 12-bit immediate and shifting it left by 1 also get its LSB zeroed out?
