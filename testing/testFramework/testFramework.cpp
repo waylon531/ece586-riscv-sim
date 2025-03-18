@@ -6,6 +6,7 @@
 #include <sstream>
 #include <regex>
 #include <cstdlib>
+#include <filesystem>
 #include "testFramework.h"
 
 testFramework::testFramework()
@@ -130,8 +131,8 @@ void testFramework::parseResult()
 
 void testFramework::generateMemImage()
 {
-    m_assemblerPath = "riscv64-unknown-elf-as";
-    m_objdumpPath = "riscv64-unknown-elf-objdump";
+    m_assemblerPath = findInFolder(getPath("([^:]*riscv/bin)(?=:|$)"), "riscv64.*as");
+    m_objdumpPath = findInFolder(getPath("([^:]*riscv/bin)(?=:|$)"), "riscv64.*objdump");
     std::string assemblyCmd = m_assemblerPath + " -march=rv32i -mabi=ilp32 " + m_assemblyFileLocation + " -o " + m_objFileLocation;
     std::string disassemblyCmd = m_objdumpPath + " -d " + m_objFileLocation + " > " + m_disassemblyFileLocation;
 
@@ -212,4 +213,27 @@ std::string testFramework::getPath(std::string fileName)
     }
 
     return dir;
+}
+
+std::string testFramework::findInFolder(std::string folderPath, std::string regEx)
+{
+    std::string retVal = "";
+    std::regex pattern(regEx);
+
+    // Iterate over the directory entries in the given folder
+    for (const auto& entry : std::filesystem::directory_iterator(folderPath)) 
+    {
+        if (entry.is_regular_file()) 
+        {
+            std::string filename = entry.path().filename().string();
+            // Check if the filename matches the regex pattern
+            if (std::regex_match(filename, pattern)) 
+            {
+                retVal = entry.path().filename().string();
+            }
+        }
+    
+    }
+
+    return retVal;
 }
