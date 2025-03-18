@@ -1,11 +1,12 @@
 use crate::debugger::{DebugCommand,self};
 use crate::decode::ParseError;
-use crate::devices::Device;
+use crate::devices::{self, Device};
 use crate::opcode::Operation;
 use crate::register::Register;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use proptest::collection::vec;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
@@ -58,7 +59,7 @@ pub struct Machine {
     env: Environment
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>,verbose:bool) -> Self{
+    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>,verbose:bool,devices:Vec<Device>) -> Self{
         let mut m = Machine {
                     memory: memmap,
                     registers: [0;31],
@@ -73,7 +74,8 @@ impl Machine {
                     web_runfullspeed: true,
                     web_step: false,
                     verbose: verbose,
-                    cycle: 0
+                    cycle: 0,
+                    Devices:Vec::new()
                     
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
