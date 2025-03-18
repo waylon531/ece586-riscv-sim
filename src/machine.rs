@@ -1,8 +1,11 @@
 use crate::debugger::{DebugCommand,self};
 use crate::decode::ParseError;
+use crate::devices::Device;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
@@ -39,14 +42,23 @@ pub struct Machine {
     //       Might be way slow though to iterate through this every cycle though
     breakpoints: Vec<u32>,
     #[serde(skip_serializing)]
+    devices: Vec<Device>,
+    #[serde(skip_serializing)]
     env: Environment
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
+    pub fn new(
+        starting_addr: u32, 
+        stack_addr: Option<u32>, 
+        memory_top: u32, 
+        memmap: Box<[u8]>, 
+        devices: Vec<Device>
+    ) -> Self {
         let mut m = Machine {
                     memory: memmap,
                     registers: [0;31],
                     memory_top,
+                    devices,
                     pc: starting_addr,
                     pass_breakpoint: false,
                     breakpoints: Vec::new(),
@@ -65,9 +77,16 @@ impl Machine {
         /* TODO: Check if commands and state channels are present */
 
 
-        // NOTE: this cannot be a global include as it conflicts with fmt::Write;
-        
-        let mut should_trigger_cmd = single_step;
+        //let mut should_trigger_cmd = single_step;
+        //Ctrl-C should trigger the cmd
+        //NOTE: Lots of places I am doing SeqCst ordering, the most restrictive ordering, this
+        //needs a pass at some point to determine if its necessary or not.
+        let should_trigger_cmd = Arc::new(AtomicBool::new(single_step));
+        let trigger_clone = should_trigger_cmd.clone();
+        ctrlc::set_handler(move || {
+            trigger_clone.store(true, Ordering::Relaxed);
+        }).expect("Error setting Ctrl-C handler");
+
         let mut rl = rustyline::DefaultEditor::new()?;
         // Set the default command to step, by default
         let mut last_cmd = DebugCommand::STEP(1);
@@ -86,14 +105,14 @@ impl Machine {
             // Otherwise decrement the step counter
             if let Some(count) = should_step {
                 if count <= 1 {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     should_step = None;
                 } else {
                     should_step = Some(count-1);
                 }
             };
 
-            if should_trigger_cmd {
+            if should_trigger_cmd.load(Ordering::SeqCst) {
                 // print debug state
                 environment::clear_term();
                 environment::write_stdout(&self.display_info());
@@ -108,24 +127,7 @@ impl Machine {
                     let mut new_status = cmd.execute(
                         self,
                         &mut should_step, 
-                        &mut should_trigger_cmd,
-                        &mut dummy_run,
-                        &mut dummy_watchlist
-                        )?;
-                    for line in new_status.drain(..) {
-                        status.push(line);
-                    }
-                }
-
-                // handle all watchlist lines
-                // this is way hackier than I thought ...
-                for cmd in watchlist.iter() {
-                    let mut dummy_run = false;
-                    let mut dummy_watchlist = Vec::new();
-                    let mut new_status = cmd.execute(
-                        self,
-                        &mut should_step, 
-                        &mut should_trigger_cmd,
+                        &mut false,
                         &mut dummy_run,
                         &mut dummy_watchlist
                         )?;
@@ -172,13 +174,15 @@ impl Machine {
 
                 let mut run = false;
                 
+                let mut value = should_trigger_cmd.load(Ordering::SeqCst);
                 let mut new_status = command.execute(
                     self,
                     &mut should_step, 
-                    &mut should_trigger_cmd,
+                    &mut value,
                     &mut run,
                     &mut watchlist
                     )?;
+                should_trigger_cmd.store(value,Ordering::SeqCst);
 
 
                 // Combine vecs
@@ -202,7 +206,7 @@ impl Machine {
                 // Should errors bail? Or bring up the debugger to explore program state?
                 // Bail for now probably, its easier (though worse)
                 Err(e@ ExecutionError::Breakpoint(_)) => {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     // Give a pass so the next step of execution can make it past the breakpoint
                     self.pass_breakpoint = true;
                     status.push(format!("{}",e));
@@ -308,16 +312,32 @@ impl Machine {
         }
     }
     pub fn read_byte(&self, addr: u32) -> Result<i8, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr < self.memory_top || self.memory_top == 0 {
+        // Check to see if the addr points to a memory mapped device
+        // The device space starts with 0xF
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_byte(device_addr).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr < self.memory_top || self.memory_top == 0 {
             Ok(self.memory[addr as usize] as i8)
         } else {
             Err(ExecutionError::LoadAccessFault(addr))
         }
     }
     pub fn read_word(&self, addr: u32) -> Result<u32, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_word(device_addr).map_err(|e| ExecutionError::DeviceError(e))? as u32)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
             Ok(self.memory[addr as usize] as u32
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u32) << 8)
                 + ((self.memory[addr.overflowing_add(2).0 as usize] as u32) << 16)
@@ -327,8 +347,15 @@ impl Machine {
         }
     }
     pub fn read_halfword(&self, addr: u32) -> Result<i16, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_halfword(device_addr).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             Ok((self.memory[addr as usize] as u16
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u16) << 8)) as i16)
         } else {
@@ -336,7 +363,15 @@ impl Machine {
         }
     }
     pub fn store_byte(&mut self, data: u8, addr: u32) -> Result<(), ExecutionError> {
-        if addr < self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_byte(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr < self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data;
             Ok(())
         } else {
@@ -344,7 +379,15 @@ impl Machine {
         }
     }
     pub fn store_halfword(&mut self, data: u16, addr: u32) -> Result<(), ExecutionError> {
-        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_halfword(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             Ok(())
@@ -354,7 +397,15 @@ impl Machine {
     }
 
     pub fn store_word(&mut self, data: u32, addr: u32) -> Result<(), ExecutionError> {
-        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
+        let device_addr = addr & 0xFFFFFFF;
+        if addr >> 28 == 0xF {
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_word(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             self.memory[addr.overflowing_add(2).0 as usize] = (data >> 16) as u8;
@@ -693,6 +744,8 @@ pub enum ExecutionError {
     ReadlineError(#[educe(PartialEq(ignore))] #[from] ReadlineError),
     #[error("Error while parsing debug command: {0}")]
     DebugParseError(#[from] debugger::DebugParseError),
+    #[error("Problem with device: {0}")]
+    DeviceError(#[educe(PartialEq(ignore))] Box<dyn std::error::Error>),
     #[error("Invalid system call: {0}")]
     InvalidSyscall(u32)
 }
@@ -704,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_write_u32() {
-        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice());
+        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice(), Vec::new());
         machine.store_word(0xBEE5AA11,0).unwrap();
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
@@ -713,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_program_completion() {
-        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice());
+        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice(), Vec::new());
         let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
         let _ = machine.store_word(store_a0_42 as u32,0);
         // JALR to RA
@@ -729,7 +782,7 @@ mod tests {
     proptest! {
         #[test]
         fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
-            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice());
+            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice(), Vec::new());
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
             println!("S: {}",s);

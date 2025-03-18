@@ -8,6 +8,6 @@ if ! [[ -e $file ]] ; then
     exit 1
 fi
 # I dunno if these are all possible sections
-riscv64-unknown-elf-objdump -D "$file" | grep -o '^[[:blank:]]*[[:xdigit:]]*:[[:blank:]][[:xdigit:]]*' > "${stripped}.mem"
+riscv64-unknown-elf-objdump -D "$file" | grep -oE '^[[:blank:]]*[[:xdigit:]]*:[[:blank:]][[:xdigit:]]*( [[:xdigit:]]+)*' > "${stripped}.mem"
 
 echo "Done!"
