@@ -1,9 +1,8 @@
 # REMU
 
-This program will read in either a memory map, specified in a custom format, or
-a flat binary file. By default the return value from the executed code will be
+This program will read in a memory map, specified in a custom format,
+and run the given program to completion. By default the return value from the executed code will be
 returned as a shell status code, but this can be suppressed with a flag.
-
 
 ## Debugger
 There is an included debugger, and this can be accessed by either:
