@@ -6,9 +6,11 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
 educe = "0.6.0"
+minifb = "0.28.0"
 rustyline = "15.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.139"
+serialport = "4.7.0"
 strum = { version = "0.27.1", features = ["derive"] }
 termion = "4.0.3"
 thiserror = "2"
@@ -16,5 +18,7 @@ tinyhttp = "0.5.0"
 crossbeam-channel = "0.5"
 single_value_channel = "1.2.2"
 url_encoded_data = "0.6.1"
+ctrlc = "3.4.5"
+
 [dev-dependencies]
 proptest = "1.0.0"

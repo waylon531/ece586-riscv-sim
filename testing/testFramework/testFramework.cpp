@@ -77,6 +77,16 @@ bool testFramework::run()
     parseResult();
     return pass;
 }
+// me when c+ has no builtin way to uppercase or lowercase strings
+bool ichar_equals(char a, char b)
+{
+    return std::tolower(static_cast<unsigned char>(a)) ==
+           std::tolower(static_cast<unsigned char>(b));
+}
+bool iequals(const std::string& a, const std::string& b)
+{
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), ichar_equals);
+}
 
 void testFramework::parseResult()
 {
@@ -101,7 +111,7 @@ void testFramework::parseResult()
 
     while(std::getline(simResult, simResultLine) && std::getline(expectedResult, expectedResultLine))
     {
-        if(simResultLine != expectedResultLine)
+        if(!iequals(simResultLine,expectedResultLine))
         {
             pass = false;
             std::cout<<"Expected results is: "<<expectedResultLine<<std::endl;
@@ -120,26 +130,13 @@ void testFramework::parseResult()
 
 void testFramework::generateMemImage()
 {
-    m_assemblerPath = "riscv64-unknown-elf-as";
-    m_objdumpPath = "riscv64-unknown-elf-objdump";
-    std::string assemblyCmd = m_assemblerPath + " -march=rv32i -mabi=ilp32 " + m_assemblyFileLocation + " -o " + m_objFileLocation;
-    std::string disassemblyCmd = m_objdumpPath + " -d " + m_objFileLocation + " > " + m_disassemblyFileLocation;
-
-    if(m_assemblerPath.empty())
-    {
-        std::cout << "riscv64 assembler not found in PATH." << std::endl;
-        std::cout << "Please add it to PATH (probably in your .bashrc file) and try again"<<std::endl;
-        std::cout << "Hint, add something that should look like: export PATH=\"/opt/riscv/bin/riscv64-unknown-linux-gnu-as:$PATH\" to the end of your .bashrc file" << std::endl;
-        std::exit(EXIT_FAILURE);;
-    }
-
-    if(m_objdumpPath.empty())
-    {
-        std::cout << "riscv64 objdump not found in PATH." << std::endl;
-        std::cout << "Please add it to PATH (probably in your .bashrc file) and try again"<<std::endl;
-        std::cout << "Hint, add something that should look like: export PATH=\"/opt/riscv/bin/riscv64-unknown-linux-gnu-objdump:$PATH\" to the end of your .bashrc file" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
+    //m_assemblerPath = "riscv64-unknown-elf-as";
+    //m_objdumpPath = "riscv64-unknown-elf-objdump";
+    //std::string riscvPath = getPath("([^:]*riscv/bin)(?=:|$)");
+    // export RISCV_PATH=/opt/riscv/bin/
+    std::string riscvPath = std::getenv("RISCV_PATH");
+    std::string assemblyCmd = riscvPath + "riscv*as -march=rv32i -mabi=ilp32 " + m_assemblyFileLocation + " -o " + m_objFileLocation;
+    std::string disassemblyCmd = riscvPath + "riscv*objdump -d " + m_objFileLocation + " > " + m_disassemblyFileLocation;
 
     system(assemblyCmd.c_str());
     system(disassemblyCmd.c_str());
