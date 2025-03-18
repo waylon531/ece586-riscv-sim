@@ -77,6 +77,16 @@ bool testFramework::run()
     parseResult();
     return pass;
 }
+// me when c+ has no builtin way to uppercase or lowercase strings
+bool ichar_equals(char a, char b)
+{
+    return std::tolower(static_cast<unsigned char>(a)) ==
+           std::tolower(static_cast<unsigned char>(b));
+}
+bool iequals(const std::string& a, const std::string& b)
+{
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), ichar_equals);
+}
 
 void testFramework::parseResult()
 {
@@ -101,7 +111,7 @@ void testFramework::parseResult()
 
     while(std::getline(simResult, simResultLine) && std::getline(expectedResult, expectedResultLine))
     {
-        if(simResultLine != expectedResultLine)
+        if(!iequals(simResultLine,expectedResultLine))
         {
             pass = false;
             std::cout<<"Expected results is: "<<expectedResultLine<<std::endl;

@@ -1,2 +1,2 @@
-addi t1, zero, 0xffffffff
-slti t2, t1, 0xffff0000
+addi t1, zero, 0xffffff00
+slti t2, t1, 0xfffffff0
