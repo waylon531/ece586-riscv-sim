@@ -2,12 +2,8 @@ use filedescriptor::FileDescriptorTable;
 use termion::raw::IntoRawMode;
 
 use crate::machine::ExecutionError;
-use core::error;
-use std::fs::File;
-use std::os::fd;
-use std::{mem, str};
+use std::str;
 use std::time::Instant;
-use std::fmt::Error;
 use std::io::{stdout, IsTerminal, Read, Write};
 mod filedescriptor;
 
@@ -52,7 +48,7 @@ impl Environment {
     }
     pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
     
-        let mut read_string = |start:u32| -> Result<Vec<u8>,ExecutionError> { 
+        let read_string = |start:u32| -> Result<Vec<u8>,ExecutionError> { 
             // this allows reading the entire memory if string is not terminated. probably shouldn't
             let strlen = memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' });
             match strlen {
@@ -87,12 +83,12 @@ impl Environment {
                     _ => {
                         /* TODO: implement flags */
                         let f_idx = self.fdtable.get_idx(a0);
-                        if(f_idx<0) { return Ok(-1) };
+                        if f_idx<0 { return Ok(-1) };
                         let mut f = self.fdtable.get_file(a0).unwrap();
                         f.read(&mut buf).map(|x| x as i32).map_err(|e| ExecutionError::IOError(e))
                     }
                 };
-                if(a1+a2 > memory.len() as u32) { return Err(ExecutionError::LoadAccessFault(a1)) };
+                if a1+a2 > memory.len() as u32 { return Err(ExecutionError::LoadAccessFault(a1)) };
                 // Actually write the file's contents to memory
                 memory[a1 as usize..a2 as usize].copy_from_slice(&buf);
                 result
@@ -100,8 +96,9 @@ impl Environment {
             }
             // write to file descriptor
             64 => {
-                let mut buf = vec![0;a2 as usize];
-                if(a1+a2 > memory.len() as u32) { return Err(ExecutionError::LoadAccessFault(a1)) };
+                // NOTE: not sure if this is a bug, the vector was getting overwritten
+                let mut buf;// = vec![0;a2 as usize];
+                if a1+a2 > memory.len() as u32 { return Err(ExecutionError::LoadAccessFault(a1)) };
                 // read memory into buffer
                 buf = memory[a1 as usize..a1 as usize+a2 as usize].to_vec();
                 let result = match a0 {
@@ -118,7 +115,7 @@ impl Environment {
                     _ => {
                         /* TODO: implement flags */
                         let f_idx = self.fdtable.get_idx(a0);
-                        if(f_idx<0) { return Ok(-1) };
+                        if f_idx<0 { return Ok(-1) };
                         let mut f = self.fdtable.get_file(a0).unwrap();
                         f.read(&mut buf).map(|x| x as i32).map_err(|e| ExecutionError::IOError(e))
                     }
