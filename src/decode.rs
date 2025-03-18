@@ -51,7 +51,7 @@ impl InstructionType {
         // Some of these have to look at both opcode and func3
         match opcode {
             // List out all RType opcodes here, separated by |
-            0b0110011 | 0b0110011 => Ok(InstructionType::RType {
+            0b0110011 => Ok(InstructionType::RType {
                 rd: Register::from_num(bitrange(combined, 7, 11))
                     .ok_or(ParseError::RegisterDecode(bitrange(combined, 7, 11)))?,
                 rs1: Register::from_num(bitrange(combined, 15, 19))
@@ -141,8 +141,8 @@ pub enum ParseError {
     InvalidInstruction(u32),
     #[error("Invalid opcode: {0:#x}")]
     InvalidOpcode(u8),
-    #[error("Invalid format: {0:#x}")] // not sure if correct formatting
-    InvalidFormat(u32),
+    //#[error("Invalid format: {0:#x}")] // not sure if correct formatting
+    //InvalidFormat(u32),
 }
 
 #[cfg(test)]

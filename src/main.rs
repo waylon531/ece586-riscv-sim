@@ -1,17 +1,19 @@
 mod debugger;
 mod decode;
+#[allow(dead_code)]
 mod devices;
 mod machine;
 mod opcode;
 mod register;
+#[allow(dead_code)]
 mod webui;
+#[allow(dead_code)]
 mod statetransfer;
 mod environment;
 
 use machine::{ExecutionError, Machine};
 use devices::DeviceConfig;
 
-use termion::raw::IntoRawMode;
 use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
@@ -72,7 +74,7 @@ struct Cli {
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
-    if (cli.single_step && ! stdout().is_terminal()) {
+    if cli.single_step && ! stdout().is_terminal() {
         println!("Cannot enter interactive mode when stdout is not a terminal.");
         return Ok(ExitCode::FAILURE);
     }
@@ -92,7 +94,7 @@ fn main() -> std::io::Result<ExitCode> {
     let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
     
     // Create a channel to send the machine state through to the web UI 
-    let (mut state_rx, state_tx) = channel_starting_with(0);
+    let (state_rx, state_tx) = channel_starting_with(0);
     
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable
@@ -227,15 +229,20 @@ fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(), ReadFileError> 
         let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
         // TODO: can have byte and word strings
         // look for number of characters
-        let len = data.len();
-        let data = u32::from_str_radix(data.trim(), 16)?;
-        bytes[addr] = data as u8;
-        if len >= 4 {
-            bytes[addr + 1 as usize] = (data >> 8) as u8;
-        }
-        if len >= 8 {
-            bytes[addr + 2 as usize] = (data >> 16) as u8;
-            bytes[addr + 3 as usize] = (data >> 24) as u8;
+        let mut offset = 0;
+        let data_chunks = data.trim().split(' ');
+        for data in data_chunks {
+            let len = data.len();
+            let data = u32::from_str_radix(data.trim(), 16)?;
+            bytes[addr+offset] = data as u8;
+            if len >= 4 {
+                bytes[addr + offset + 1 as usize] = (data >> 8) as u8;
+            }
+            if len >= 8 {
+                bytes[addr + offset + 2 as usize] = (data >> 16) as u8;
+                bytes[addr + offset + 3 as usize] = (data >> 24) as u8;
+            }
+            offset += len/2;
         }
     }
     Ok(())

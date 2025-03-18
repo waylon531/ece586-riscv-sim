@@ -1,12 +1,12 @@
-use clap::builder::Str;
 use filedescriptor::FileDescriptorTable;
 use termion::raw::IntoRawMode;
 
 use crate::machine::ExecutionError;
-use std::fs::File;
-use std::{mem, str};
+use std::str;
 use std::time::Instant;
 use std::io::{stdout,IsTerminal, Write};
+
+#[allow(dead_code)]
 mod filedescriptor;
 
 /* This is the stupidest way on the planet to do this */
@@ -17,15 +17,15 @@ pub fn write_newline() {
     write_stdout(match stdout().is_terminal() { true => "\r\n", false => "\n" });
 }
 pub fn clear_term() {
-    if (stdout().is_terminal()) {
+    if stdout().is_terminal() {
         let mut stdout = stdout().into_raw_mode().unwrap();
-        write!(stdout,"{}",termion::clear::All);
+        write!(stdout,"{}",termion::clear::All).unwrap();
     }
 }
 pub fn write_stdout(output: &str) {
-    if (stdout().is_terminal()) {
+    if stdout().is_terminal() {
         let mut stdout = stdout().into_raw_mode().unwrap();
-        write!(stdout,"{}",output);
+        write!(stdout,"{}",output).unwrap();
     } else {
         print!("{}", output);
     }
@@ -39,7 +39,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        let mut e = Environment {
+        let e = Environment {
             fdtable: FileDescriptorTable::new(),
             timer: Instant::now()
         };
@@ -48,10 +48,10 @@ impl Environment {
     pub fn reset_timer(&mut self) -> () {
         self.timer = Instant::now();
     }
-    pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
+    pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, _a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
 
-        let mut read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
-        let mut read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
+        let _read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
+        let read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
         match a7 {
             // open(char* pathname, int flags)
             // a0: pathname, a1: flags

@@ -8,22 +8,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
-use core::time;
 use std::fmt::Write;
-use std::io::Seek;
-use std::thread::sleep;
-use std::{
-    fs::File,
-    io::{self, Read,Write as ioWrite,Stdout,Stdin},
-    os::unix::io::FromRawFd,
-};
+use std::io::{self,Stdin};
 use single_value_channel::Updater as SvcSender;
 use crossbeam_channel::Receiver as CbReceiver;
 use educe::Educe;
 
 use thiserror::Error;
 
-use crate::statetransfer;
 use crate::environment::{self, Environment};
 
 #[derive(Serialize)]
@@ -79,14 +71,12 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, _commands_rx: Option<CbReceiver<i32>>, _state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
         // reset timer
         self.env.reset_timer();
         /* TODO: Check if commands and state channels are present */
 
 
-        // NOTE: this cannot be a global include as it conflicts with fmt::Write;
-        use std::io::Write;
         //let mut should_trigger_cmd = single_step;
         //Ctrl-C should trigger the cmd
         //NOTE: Lots of places I am doing SeqCst ordering, the most restrictive ordering, this
@@ -665,11 +655,11 @@ impl Machine {
                 )
             },
             DIV(rd, rs1, rs2) => {
-                let res:i32 = 0;
+                let res:i32;
                 if self.registers[rs2] == 0 {
-                    let res = (0 - 1) as i32;
+                    res = (0 - 1) as i32;
                 } else {
-                    let res:i32 = (self.registers[rs1] as i32) / (self.registers[rs2] as i32);
+                    res = (self.registers[rs1] as i32) / (self.registers[rs2] as i32);
                 }
                 self.set_reg(
                     rd,
@@ -677,11 +667,11 @@ impl Machine {
                 )
             },
             DIVU(rd, rs1, rs2) => {
-                let res = 0;
+                let res;
                 if self.registers[rs2] == 0 {
-                    let res = (0 - 1) as i32;
+                    res = (0 - 1) as u32;
                 } else {
-                    let res:u32 = (self.registers[rs1] as u32) / (self.registers[rs2] as u32);
+                    res = (self.registers[rs1] as u32) / (self.registers[rs2] as u32);
                 }
                 self.set_reg(
                     rd,
@@ -689,11 +679,11 @@ impl Machine {
                 )
             },
             REM(rd, rs1, rs2) => {
-                let res: i32 = 0;
+                let res: i32;
                 if self.registers[rs2] == 0 {
-                    let res: i32 = self.registers[rs1].clone() as i32;
+                    res = self.registers[rs1].clone() as i32;
                 } else {
-                    let res:i32 = (self.registers[rs1] as i32)  % (self.registers[rs2] as i32);
+                    res = (self.registers[rs1] as i32)  % (self.registers[rs2] as i32);
                 }
                 self.set_reg(
                     rd,
@@ -701,11 +691,11 @@ impl Machine {
                 )
             },
             REMU(rd, rs1, rs2) => {
-                let res = 0;
+                let res;
                 if self.registers[rs2] == 0 {
-                    let res = (0 - 1) as u32;
+                    res = (0 - 1) as u32;
                 } else {
-                    let res:u32 = (self.registers[rs1] as u32) % (self.registers[rs2] as u32);
+                    res = (self.registers[rs1] as u32) % (self.registers[rs2] as u32);
                 }
                 self.set_reg(
                     rd,

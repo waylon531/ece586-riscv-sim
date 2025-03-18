@@ -1,5 +1,5 @@
 /* struct to represent command sent to machine  */
-enum control_code {
+enum ControlCode {
   RUN,
   STOP,
   STEP,
@@ -12,7 +12,8 @@ enum control_code {
   WATCHREG,
   JMP
 }
-struct control_cmd {
+
+struct ControlCmd {
   
 
 }

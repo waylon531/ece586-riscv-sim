@@ -1,6 +1,6 @@
 use super::{DeviceConfigError,WordDevice,Device};
 
-use minifb::{Window,WindowOptions};
+use minifb::{Window,WindowOptions,Scale};
 
 use std::collections::HashMap;
 use std::error;
@@ -15,6 +15,9 @@ enum FramebufferBackend {
     MiniFB(JoinHandle<()>)
 }
 
+const WIDTH: usize = 160;
+const HEIGHT: usize = 144;
+
 pub struct Framebuffer {
     base_address: u32,
     backend: FramebufferBackend,
@@ -28,7 +31,7 @@ impl Framebuffer {
             // Default of 0xFF000000
             None => 0xF000000
         };
-        let pixel_buffer = Arc::new(Mutex::new(vec![0u32; 640*400].into_boxed_slice()));
+        let pixel_buffer = Arc::new(Mutex::new(vec![0u32; WIDTH*HEIGHT].into_boxed_slice()));
         let pixel_buffer_copy = pixel_buffer.clone();
         let backend = match options.get("backend").map(|s| s.as_str()) {
             None | Some("minifb") => {
@@ -37,7 +40,14 @@ impl Framebuffer {
                     let pixel_buffer = pixel_buffer_copy;
                     // I feel like I should be able to initialize this outside the thread and move
                     // it in, but whatever
-                    let mut window = match Window::new("REMU", 640, 400, WindowOptions::default()) {
+                    let mut options = WindowOptions::default();
+                    options.scale = Scale::X4;
+                    let mut window = match Window::new(
+                        "REMU", 
+                        WIDTH, 
+                        HEIGHT, 
+                        options,
+                        ) {
                         Ok(win) => win,
                         Err(err) => {
                             eprintln!("\r\n{}\r\n",err);
@@ -50,7 +60,7 @@ impl Framebuffer {
                     loop {
                         {
                             window.update_with_buffer(
-                                &**pixel_buffer.lock().expect("FB poisoned"),640,400
+                                &**pixel_buffer.lock().expect("FB poisoned"),WIDTH,HEIGHT
                             ).expect("Unable to write to FB");
                         }
                         // update at around 30fps
@@ -76,7 +86,7 @@ impl Framebuffer {
 }
 impl WordDevice for Framebuffer {
     fn memory_range(&self) -> RangeInclusive<u32> {
-        self.base_address ..= (self.base_address + (32*640*400))
+        self.base_address ..= (self.base_address + (32*WIDTH*HEIGHT) as u32)
     }
     // This only supports aligned access
     fn store_word(&self, addr: u32, data: u32) -> Result<(),Box<dyn error::Error>> {
