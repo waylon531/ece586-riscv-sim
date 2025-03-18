@@ -3,13 +3,14 @@ mod decode;
 mod machine;
 mod opcode;
 mod register;
+#[allow(dead_code)]
 mod webui;
+#[allow(dead_code)]
 mod statetransfer;
 mod environment;
 
 use machine::{ExecutionError, Machine};
 
-use termion::raw::IntoRawMode;
 use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
@@ -65,7 +66,7 @@ struct Cli {
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
-    if (cli.single_step && ! stdout().is_terminal()) {
+    if cli.single_step && ! stdout().is_terminal() {
         println!("Cannot enter interactive mode when stdout is not a terminal.");
         return Ok(ExitCode::FAILURE);
     }
@@ -85,7 +86,7 @@ fn main() -> std::io::Result<ExitCode> {
     let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
     
     // Create a channel to send the machine state through to the web UI 
-    let (mut state_rx, state_tx) = channel_starting_with(0);
+    let (state_rx, state_tx) = channel_starting_with(0);
     
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable

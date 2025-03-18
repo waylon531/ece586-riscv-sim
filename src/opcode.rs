@@ -114,7 +114,7 @@ impl Operation {
                 opcode,
             }) => {
                 match opcode {
-                    0b0110011 | 0b0110011 => {
+                    0b0110011  => {
                         // This can be ADD, SUB, SLL, SLT, SLTU, XOR
                         match (funct3, funct7) {
                             (0, 0) => ADD(rd, rs1, rs2),
@@ -127,14 +127,14 @@ impl Operation {
                             (0b101, 0b0100000) => SRA(rd, rs1, rs2),
                             (0b110, 0) => OR(rd, rs1, rs2),
                             (0b111, 0) => AND(rd, rs1, rs2),
-                            (0b000,0b0100000) => MUL(rd,rs1,rs2),
-                            (0b001,0b0100000) => MULH(rd,rs1,rs2),
-                            (0b010,0b0100000) => MULSU(rd,rs1,rs2),
-                            (0b011,0b0100000) => MULU(rd,rs1,rs2),
-                            (0b100,0b0100000) => DIV(rd,rs1,rs2),
-                            (0b101,0b0100000) => DIVU(rd,rs1,rs2),
-                            (0b110,0b0100000) => REM(rd,rs1,rs2),
-                            (0b111,0b0100000) => REM(rd,rs1,rs2),
+                            (0b000,0b0000001) => MUL(rd,rs1,rs2),
+                            (0b001,0b0000001) => MULH(rd,rs1,rs2),
+                            (0b010,0b0000001) => MULSU(rd,rs1,rs2),
+                            (0b011,0b0000001) => MULU(rd,rs1,rs2),
+                            (0b100,0b0000001) => DIV(rd,rs1,rs2),
+                            (0b101,0b0000001) => DIVU(rd,rs1,rs2),
+                            (0b110,0b0000001) => REM(rd,rs1,rs2),
+                            (0b111,0b0000001) => REMU(rd,rs1,rs2),
                             _ => return Err(ParseError::InvalidInstruction(combined)),
                         }
                     }

@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::File;
 
 use crate::ReadFileError;
 
@@ -40,7 +40,7 @@ impl FileDescriptorTable {
       file_descriptors: Vec::new()
     }
   }
-  pub fn open(&mut self, filename: &Vec<u8>, flags: u32 ) -> Result<i32,ReadFileError> {
+  pub fn open(&mut self, _filename: &Vec<u8>, _flags: u32 ) -> Result<i32,ReadFileError> {
     Ok(0)
   }
 }
@@ -50,7 +50,7 @@ impl FileDescriptor {
   pub fn new(filename: &str, flags: u32) -> Result<Self,ReadFileError> {
     Ok(FileDescriptor { 
       f: File::create(filename)?,
-      flags: flags
+      flags
     })
   }
   fn has_flag(&mut self, flag: OpenFlags) -> bool {
