@@ -96,7 +96,7 @@ impl Environment {
                 let mut buf = vec![0;a2 as usize];
                 if(a1+a2 > memory.len() as u32) { return Err(ExecutionError::LoadAccessFault(a1)) };
                 // read memory into buffer
-                buf = memory[a1 as usize..a2 as usize].to_vec();
+                buf = memory[a1 as usize..a1 as usize+a2 as usize].to_vec();
                 let result = match a0 {
                     // error if trying to write to stdin
                     0 => {
