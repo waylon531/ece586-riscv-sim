@@ -12,6 +12,10 @@ This framework requires a few things
     `$ source .bashrc`
 - GCC build tools, make etc...
 - Cmake, at least version 3.23.1
+- This framework tests the *release* build of the program in `target/release/`. You need to run
+  `cargo build --release`
+  to make sure you're testing the latest version
+  
 # Building and Running
 To generate the tests, in the `testing/testGenerator/` folder run:
 - `$ cmake -S . -B build` to generate the makefiles.
@@ -29,6 +33,16 @@ This builds test binaries in each of the following folders
 
 Inside one of those folders will be a binary called `<foldername>Test`, and to
 run the test execute `$ ./<foldername>Test`.
+
+Alternatively, you can use the provided scripts like so:
+
+- `$ ./buildtests.sh`
+
+to generate and build all the tests, and
+
+- `$ ./runTests.sh`
+
+to run them. This will by default run all available tests; you can specify `-i` if you want to pause after each one, or you can specify the folder name of the group of tests you wish to run.
 
 # Adding Tests
 The part that actually does the testing will be your assembly and expected 
