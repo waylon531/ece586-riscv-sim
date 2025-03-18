@@ -1,21 +1,31 @@
 mod debugger;
 mod decode;
+#[allow(dead_code)]
+mod devices;
 mod machine;
 mod opcode;
 mod register;
+#[allow(dead_code)]
 mod webui;
+#[allow(dead_code)]
+mod statetransfer;
+mod environment;
 
 use machine::{ExecutionError, Machine};
+use devices::DeviceConfig;
 
-use termion::raw::IntoRawMode;
 use thiserror::Error;
 
 use clap::{Parser, ValueEnum};
 use std::fs::File;
-use std::io::{stdout, stdin, Write, BufReader, BufRead};
+use std::io::{stdout, stdin, Write, BufReader, BufRead, IsTerminal};
 use std::num;
 use std::process::ExitCode;
 use std::thread;
+
+use single_value_channel::{channel_starting_with,Updater as SvcSender};
+use crossbeam_channel::{unbounded,Receiver as CbReceiver, Sender as CbSender};
+
 
 #[derive(ValueEnum, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
@@ -55,24 +65,45 @@ struct Cli {
     /// Suppress exit code returned from emulated program
     #[arg(long)]
     suppress_status: bool,
+
+    // These have to be parsed later, clap isnt smart enough to parse them
+    /// Enable a specific device. Format is `--device NAME,opt=foo,opt2=foo2`.
+    #[arg(long)]
+    device: Vec<String>
 }
 
 fn main() -> std::io::Result<ExitCode> {
     let cli = Cli::parse();
+    if cli.single_step && ! stdout().is_terminal() {
+        println!("Cannot enter interactive mode when stdout is not a terminal.");
+        return Ok(ExitCode::FAILURE);
+    }
     // if we're not running the web ui
     if !cli.web_ui {
         // just launch into the simulator
-        return run_simulator(cli);
+        return run_simulator(cli, None, None);
     }
     // otherwise, run simulator and web server in separate threads
+    
+    // Create an unbounded channel for control messages from the web UI to the machine
+    /* 
+    
+    TODO: create data type for machine state and commands
+    
+     */
+    let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
+    
+    // Create a channel to send the machine state through to the web UI 
+    let (state_rx, state_tx) = channel_starting_with(0);
+    
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable
-        let simulator_thread = thread::spawn(move || {
-            run_simulator(cli_for_simulator).unwrap();
+        let _ = thread::spawn(move || {
+            run_simulator(cli_for_simulator, Some(commands_rx), Some(state_tx)).unwrap();
         });
     });
     let web_server_thread = thread::spawn(|| {
-        webui::run_server();
+        webui::run_server(commands_tx, state_rx);
     });
     web_server_thread.join().unwrap();
     simulator_thread.join().unwrap();
@@ -80,9 +111,10 @@ fn main() -> std::io::Result<ExitCode> {
     return Ok(ExitCode::from(0));
 }
 
-fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
+fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
     // Set up input and output
-    let mut stdout = stdout().into_raw_mode().unwrap();
+    
+    
     let stdin = stdin();
 
     let capacity = if cli.memory_top == 0 {
@@ -91,6 +123,23 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         cli.memory_top as usize
     };
 
+    // Initialize extra hw devices
+    let mut devices = Vec::new();
+    for device_str in cli.device {
+        match DeviceConfig::from_str(&device_str) {
+            Ok(config) => match config.into_device() {
+                Ok(device) => devices.push(device),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return Ok(ExitCode::FAILURE);
+                },
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    }
     // Check to make sure we can open dump_to and overwrite it
     // In case of a crash this file will then be empty
     let dump_to = match cli.dump_to {
@@ -115,10 +164,11 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
         cli.stack_addr,
         cli.memory_top,
         mmap.into_boxed_slice(),
+        devices
     );
 
     // Run the machine to completion
-    let result = machine.run(cli.single_step, &stdin, &mut stdout);
+    let result = machine.run(cli.single_step, &stdin, commands_rx,state_tx);
 
     let mut error_message = None;
 
@@ -145,12 +195,16 @@ fn run_simulator(cli: Cli) -> std::io::Result<ExitCode> {
 
     // Print the registers one last time
     if !cli.quiet {
-        write!(stdout,"{}",termion::clear::All)?;
-        write!(stdout,"{}",machine.display_info())?;
+
+        environment::clear_term();
+        environment::write_stdout(&machine.display_info());
+
     }
 
     if let Some(err) = error_message {
-        write!(stdout,"\r\n{}\r\n",err)?;
+        environment::write_newline();
+        environment::write_stdout(&err);
+        environment::write_newline();
     }
 
     // Exit
@@ -175,15 +229,20 @@ fn parse_file(bytes: &mut Vec<u8>, filename: &str) -> Result<(), ReadFileError> 
         let addr: usize = u32::from_str_radix(addr.trim(), 16)? as usize;
         // TODO: can have byte and word strings
         // look for number of characters
-        let len = data.len();
-        let data = u32::from_str_radix(data.trim(), 16)?;
-        bytes[addr] = data as u8;
-        if len >= 4 {
-            bytes[addr + 1 as usize] = (data >> 8) as u8;
-        }
-        if len >= 8 {
-            bytes[addr + 2 as usize] = (data >> 16) as u8;
-            bytes[addr + 3 as usize] = (data >> 24) as u8;
+        let mut offset = 0;
+        let data_chunks = data.trim().split(' ');
+        for data in data_chunks {
+            let len = data.len();
+            let data = u32::from_str_radix(data.trim(), 16)?;
+            bytes[addr+offset] = data as u8;
+            if len >= 4 {
+                bytes[addr + offset + 1 as usize] = (data >> 8) as u8;
+            }
+            if len >= 8 {
+                bytes[addr + offset + 2 as usize] = (data >> 16) as u8;
+                bytes[addr + offset + 3 as usize] = (data >> 24) as u8;
+            }
+            offset += len/2;
         }
     }
     Ok(())

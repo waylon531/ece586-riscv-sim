@@ -63,7 +63,7 @@ impl InstructionType {
                 opcode,
             }),
             // List out all IType opcodes here, separated by |
-            0b0000011 | 0b0010011 | 0b1100111 => {
+            0b0000011 | 0b0010011 | 0b1100111 | 0b1110011 => {
                 Ok(InstructionType::IType {
                     rd: Register::from_num(bitrange(combined, 7, 11))
                         .ok_or(ParseError::RegisterDecode(bitrange(combined, 7, 11)))?,
@@ -141,8 +141,8 @@ pub enum ParseError {
     InvalidInstruction(u32),
     #[error("Invalid opcode: {0:#x}")]
     InvalidOpcode(u8),
-    #[error("Invalid format: {0:#x}")] // not sure if correct formatting
-    InvalidFormat(u32),
+    //#[error("Invalid format: {0:#x}")] // not sure if correct formatting
+    //InvalidFormat(u32),
 }
 
 #[cfg(test)]

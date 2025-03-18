@@ -1,20 +1,26 @@
 use crate::debugger::{DebugCommand,self};
 use crate::decode::ParseError;
+use crate::devices::Device;
 use crate::opcode::Operation;
 use crate::register::Register;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use rustyline::error::ReadlineError;
 use serde::Serialize;
 use std::fmt::Write;
-use std::io::{Stdout,Stdin,self};
-
+use std::io::{self,Stdin};
+use single_value_channel::Updater as SvcSender;
+use crossbeam_channel::Receiver as CbReceiver;
 use educe::Educe;
 
 use thiserror::Error;
 
+use crate::environment::{self, Environment};
+
 #[derive(Serialize)]
 pub struct Machine {
-    // Maybe this should be on the heap
+    // Maybe this should be  on the heap
     // How is memory mapped? Is there max 64K? Or is that just the size of program
     // we can load?
     //
@@ -34,17 +40,29 @@ pub struct Machine {
     //       index/breakpoint number to breakpoint which is nice for ui
     //
     //       Might be way slow though to iterate through this every cycle though
-    breakpoints: Vec<u32>
+    breakpoints: Vec<u32>,
+    #[serde(skip_serializing)]
+    devices: Vec<Device>,
+    #[serde(skip_serializing)]
+    env: Environment
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
+    pub fn new(
+        starting_addr: u32, 
+        stack_addr: Option<u32>, 
+        memory_top: u32, 
+        memmap: Box<[u8]>, 
+        devices: Vec<Device>
+    ) -> Self {
         let mut m = Machine {
                     memory: memmap,
                     registers: [0;31],
                     memory_top,
+                    devices,
                     pc: starting_addr,
                     pass_breakpoint: false,
-                    breakpoints: Vec::new()
+                    breakpoints: Vec::new(),
+                    env:Environment::new()
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
         // nearest 16 bytes
@@ -53,10 +71,22 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, stdout: &mut Stdout) -> Result<(),ExecutionError> {
-        // NOTE: this cannot be a global include as it conflicts with fmt::Write;
-        use std::io::Write;
-        let mut should_trigger_cmd = single_step;
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, _commands_rx: Option<CbReceiver<i32>>, _state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+        // reset timer
+        self.env.reset_timer();
+        /* TODO: Check if commands and state channels are present */
+
+
+        //let mut should_trigger_cmd = single_step;
+        //Ctrl-C should trigger the cmd
+        //NOTE: Lots of places I am doing SeqCst ordering, the most restrictive ordering, this
+        //needs a pass at some point to determine if its necessary or not.
+        let should_trigger_cmd = Arc::new(AtomicBool::new(single_step));
+        let trigger_clone = should_trigger_cmd.clone();
+        ctrlc::set_handler(move || {
+            trigger_clone.store(true, Ordering::Relaxed);
+        }).expect("Error setting Ctrl-C handler");
+
         let mut rl = rustyline::DefaultEditor::new()?;
         // Set the default command to step, by default
         let mut last_cmd = DebugCommand::STEP(1);
@@ -65,25 +95,29 @@ impl Machine {
         let mut status: Vec<String> = Vec::new();
         let mut watchlist: Vec<DebugCommand> = Vec::new();
         loop {
-
+            /*
+                At the start of each cycle, if the web server is running, we want to communicate with it.
+                We exchange information - we send the current state of the machine, and we read commands sent from the web interface.
+                Those commands may include modifications to registers or memory addresses - so we interpret those.
+             */
             // Check if we stepping for N times, and if we are at the end then pull the debugger
             // back up
             // Otherwise decrement the step counter
             if let Some(count) = should_step {
                 if count <= 1 {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     should_step = None;
                 } else {
                     should_step = Some(count-1);
                 }
             };
 
-            if should_trigger_cmd {
+            if should_trigger_cmd.load(Ordering::SeqCst) {
                 // print debug state
-                write!(stdout,"{}",termion::clear::All)?;
-                write!(stdout,"{}",self.display_info())?;
+                environment::clear_term();
+                environment::write_stdout(&self.display_info());
+                environment::write_newline();
 
-                write!(stdout,"\r\n")?;
 
                 // handle all watchlist lines
                 // this is way hackier than I thought ...
@@ -93,7 +127,7 @@ impl Machine {
                     let mut new_status = cmd.execute(
                         self,
                         &mut should_step, 
-                        &mut should_trigger_cmd,
+                        &mut false,
                         &mut dummy_run,
                         &mut dummy_watchlist
                         )?;
@@ -104,10 +138,11 @@ impl Machine {
 
                 // print status lines
                 for line in status.drain(..) {
-                    write!(stdout,"{}\r\n",line)?;
+                    environment::write_stdout(&line);
+                    environment::write_newline();
                 }
 
-                write!(stdout,"\r\n")?;
+                environment::write_stdout("\r\n");
 
                 // read prompt
                 let readline = rl.readline(">> ");
@@ -139,13 +174,15 @@ impl Machine {
 
                 let mut run = false;
                 
+                let mut value = should_trigger_cmd.load(Ordering::SeqCst);
                 let mut new_status = command.execute(
                     self,
                     &mut should_step, 
-                    &mut should_trigger_cmd,
+                    &mut value,
                     &mut run,
                     &mut watchlist
                     )?;
+                should_trigger_cmd.store(value,Ordering::SeqCst);
 
 
                 // Combine vecs
@@ -169,7 +206,7 @@ impl Machine {
                 // Should errors bail? Or bring up the debugger to explore program state?
                 // Bail for now probably, its easier (though worse)
                 Err(e@ ExecutionError::Breakpoint(_)) => {
-                    should_trigger_cmd = true;
+                    should_trigger_cmd.store(true,Ordering::SeqCst);
                     // Give a pass so the next step of execution can make it past the breakpoint
                     self.pass_breakpoint = true;
                     status.push(format!("{}",e));
@@ -188,9 +225,12 @@ impl Machine {
     // String formatting should never fail, it's likely safe to unwrap here
     pub fn display_info(&self) -> String {
         let mut buf = String::new();
-        write!(buf,"\rPC:\t  {:#010x}", self.pc).unwrap();
+        // Why am I doing this crazy nonsense? To ensure we only print terminal control characters if the output is a terminal.
+        if environment::which_new_line() == "\r\n" { write!(buf,"{}","\r").unwrap(); };
+        write!(buf,"PC:\t  {:#010x}", self.pc).unwrap();
         for i in 0 .. 31 {
-            write!(buf,"\n\r{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
+            write!(buf,"{}",environment::which_new_line()).unwrap();
+            write!(buf,"{1:?}:\t{0:>12}\t{0:#010x}",self.registers[i],Register::from_num((i as u32)+1).unwrap()).unwrap();
             if i < 16 {
                 let context: i32 = (i as i32-8)*4;
                 let to_fetch = self.pc.overflowing_add_signed(context);
@@ -227,7 +267,7 @@ impl Machine {
         }
         // TODO: Print a little bit of memory context, around where the stack is
         // And some instruction context as well
-        write!(buf,"\r\n").unwrap();
+        environment::write_newline();
         buf
 
     }
@@ -272,16 +312,32 @@ impl Machine {
         }
     }
     pub fn read_byte(&self, addr: u32) -> Result<i8, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr < self.memory_top || self.memory_top == 0 {
+        // Check to see if the addr points to a memory mapped device
+        // The device space starts with 0xF
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_byte(device_addr).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr < self.memory_top || self.memory_top == 0 {
             Ok(self.memory[addr as usize] as i8)
         } else {
             Err(ExecutionError::LoadAccessFault(addr))
         }
     }
     pub fn read_word(&self, addr: u32) -> Result<u32, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_word(device_addr).map_err(|e| ExecutionError::DeviceError(e))? as u32)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
             Ok(self.memory[addr as usize] as u32
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u32) << 8)
                 + ((self.memory[addr.overflowing_add(2).0 as usize] as u32) << 16)
@@ -291,8 +347,15 @@ impl Machine {
         }
     }
     pub fn read_halfword(&self, addr: u32) -> Result<i16, ExecutionError> {
-        //TODO in future: check if this is a memory mapped device
-        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.read_halfword(device_addr).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             Ok((self.memory[addr as usize] as u16
                 + ((self.memory[addr.overflowing_add(1).0 as usize] as u16) << 8)) as i16)
         } else {
@@ -300,7 +363,15 @@ impl Machine {
         }
     }
     pub fn store_byte(&mut self, data: u8, addr: u32) -> Result<(), ExecutionError> {
-        if addr < self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_byte(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr < self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data;
             Ok(())
         } else {
@@ -308,7 +379,15 @@ impl Machine {
         }
     }
     pub fn store_halfword(&mut self, data: u16, addr: u32) -> Result<(), ExecutionError> {
-        if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
+        if addr >> 28 == 0xF {
+            let device_addr = addr & 0xFFFFFFF;
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_halfword(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(2) <= self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             Ok(())
@@ -318,7 +397,15 @@ impl Machine {
     }
 
     pub fn store_word(&mut self, data: u32, addr: u32) -> Result<(), ExecutionError> {
-        if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
+        let device_addr = addr & 0xFFFFFFF;
+        if addr >> 28 == 0xF {
+            for device in self.devices.iter_mut() {
+                if device.memory_range().contains(&device_addr) {
+                    return Ok(device.store_word(device_addr,data).map_err(|e| ExecutionError::DeviceError(e))?)
+                }
+            }
+            Err(ExecutionError::LoadAccessFault(addr))
+        } else if addr.saturating_add(4) <= self.memory_top || self.memory_top == 0 {
             self.memory[addr as usize] = data as u8;
             self.memory[addr.overflowing_add(1).0 as usize] = (data >> 8) as u8;
             self.memory[addr.overflowing_add(2).0 as usize] = (data >> 16) as u8;
@@ -487,7 +574,9 @@ impl Machine {
             ),
             LHU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
+                // Note the two as statements here, with just as 32 sign extension will still
+                // happen
+                self.read_halfword(self.registers[rs1].overflowing_add_signed(imm).0)? as u16 as u32,
             ),
             LB(rd, rs1, imm) => self.set_reg(
                 rd,
@@ -495,7 +584,7 @@ impl Machine {
             ),
             LBU(rd, rs1, imm) => self.set_reg(
                 rd,
-                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u32,
+                self.read_byte(self.registers[rs1].overflowing_add_signed(imm).0)? as u8 as u32,
             ),
 
             SW(rs1, rs2, imm) => self.store_word(
@@ -511,8 +600,20 @@ impl Machine {
                 self.registers[rs1].overflowing_add_signed(imm).0,
             )?,
 
+            // Division
+
+
             // Evironment call/syscall
-            ECALL => {}
+            ECALL => {
+                /* Fun with system calls! I think this is technically a BIOS? */
+                // this should definitely be its own module I feel
+                // a7: syscall, a0-a2: arguments
+                match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2], &mut self.memory) {
+                    Ok(result) => { self.set_reg(Register::A0, result as u32)},
+                    Err(e) => { return Err(e) }
+                };
+                
+            }
 
             // Breakpoint for us
             EBREAK => return Err(ExecutionError::Breakpoint(self.pc)),
@@ -524,11 +625,92 @@ impl Machine {
             // and they are effectively NOPs
             // Same with FENCE
             HINT | FENCE => {}
+
+            /* Multiplication / Division */ 
+            MUL(rd, rs1, rs2) => {
+                self.set_reg(
+                    rd,
+                    ((self.registers[rs1] as i32) * (self.registers[rs2] as i32)) as u32,
+                )
+            },
+            MULH(rd, rs1, rs2) => {
+                let res: i64 = (self.registers[rs1] as i64) * (self.registers[rs2] as i64) as i64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            MULSU(rd, rs1, rs2) => {
+                let res: i64 = (self.registers[rs1] as i64) * (self.registers[rs2] as u64) as i64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            MULU(rd, rs1, rs2) => {
+                let res: u64 = (self.registers[rs1] as u64) * (self.registers[rs2] as u64) as u64;
+                self.set_reg(
+                    rd,
+                    (res >> 32) as u32,
+                )
+            },
+            DIV(rd, rs1, rs2) => {
+                let res:i32;
+                if self.registers[rs2] == 0 {
+                    res = (0 - 1) as i32;
+                } else {
+                    res = (self.registers[rs1] as i32) / (self.registers[rs2] as i32);
+                }
+                self.set_reg(
+                    rd,
+                    res as u32
+                )
+            },
+            DIVU(rd, rs1, rs2) => {
+                let res;
+                if self.registers[rs2] == 0 {
+                    res = (0 - 1) as u32;
+                } else {
+                    res = (self.registers[rs1] as u32) / (self.registers[rs2] as u32);
+                }
+                self.set_reg(
+                    rd,
+                    res
+                )
+            },
+            REM(rd, rs1, rs2) => {
+                let res: i32;
+                if self.registers[rs2] == 0 {
+                    res = self.registers[rs1].clone() as i32;
+                } else {
+                    res = (self.registers[rs1] as i32)  % (self.registers[rs2] as i32);
+                }
+                self.set_reg(
+                    rd,
+                    res as u32
+                )
+            },
+            REMU(rd, rs1, rs2) => {
+                let res;
+                if self.registers[rs2] == 0 {
+                    res = (0 - 1) as u32;
+                } else {
+                    res = (self.registers[rs1] as u32) % (self.registers[rs2] as u32);
+                }
+                self.set_reg(
+                    rd,
+                    res
+                )
+            },
+
+
         }
 
         if increment_pc {
             self.pc = self.pc.overflowing_add(4).0;
         }
+
+        
         Ok(())
     }
 }
@@ -562,6 +744,10 @@ pub enum ExecutionError {
     ReadlineError(#[educe(PartialEq(ignore))] #[from] ReadlineError),
     #[error("Error while parsing debug command: {0}")]
     DebugParseError(#[from] debugger::DebugParseError),
+    #[error("Problem with device: {0}")]
+    DeviceError(#[educe(PartialEq(ignore))] Box<dyn std::error::Error>),
+    #[error("Invalid system call: {0}")]
+    InvalidSyscall(u32)
 }
 
 #[cfg(test)]
@@ -571,7 +757,7 @@ mod tests {
 
     #[test]
     fn test_write_u32() {
-        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice());
+        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice(), Vec::new());
         machine.store_word(0xBEE5AA11,0).unwrap();
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
@@ -580,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_program_completion() {
-        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice());
+        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice(), Vec::new());
         let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
         let _ = machine.store_word(store_a0_42 as u32,0);
         // JALR to RA
@@ -596,7 +782,7 @@ mod tests {
     proptest! {
         #[test]
         fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
-            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice());
+            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice(), Vec::new());
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
             println!("S: {}",s);

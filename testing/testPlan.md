@@ -38,7 +38,7 @@
 # Loads
 - LB, LH, LW, LBU, LHU
 - Need to check that immediate is formed properly and signed. No direct way though.
-- flash a byte, halfword, and word to memory.
+- store a byte, halfword, and word to memory.
 - If the value from mem is unsigned, make sure that the value we flashed is zero extended correctly
 - If the value from mem is signed make sure we are sign extending it correctly
 
