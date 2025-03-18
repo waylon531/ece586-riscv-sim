@@ -57,11 +57,11 @@ register and Program Counter values. Your assembly code file **MUST** be called 
 and your expected results file **MUST** be called `some_descriptive_name.txt`. If 
 your files are not named that, then your test will break.
 
-You then need to reference your tests in the `main.cpp` file in `testing/testGenerator`. You can do this manually, or you can run the provided script:
+If you've added a new group of test (ie a folder), need to reference your tests in the `main.cpp` file in `testing/testGenerator`. You can do this manually, or you can run the provided script:
 
-- `$ ./addtest.sh [testname]`
+- `$ ./addtest.sh [groupname]`
 
-Use `./addtest.sh -d [testname]` to remove a test.
+Use `./addtest.sh -d [groupname]` to remove a test.
 
 After you have created your tests re-run the test generator, inside
 `testing/testGenerator` run `./testGenerator`. 
