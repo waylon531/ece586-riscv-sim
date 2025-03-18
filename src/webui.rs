@@ -7,7 +7,6 @@ use std::fs;
 use crossbeam_channel::Sender as CbSender;
 use single_value_channel::Receiver as SvcReceiver;
 use std::sync::{LazyLock,Mutex};
-use crate::statetransfer;
 
 static COMMANDS_TX: LazyLock<Mutex<Option<CbSender<i32>>>> = LazyLock::new(|| Mutex::new(None));
 static STATE_RX: LazyLock<Mutex<Option<SvcReceiver<i32>>>> = LazyLock::new(|| Mutex::new(None));
@@ -126,7 +125,7 @@ fn send_commands() {
 }
 fn receive_state() {
     let mut state_rx_guard = STATE_RX.lock().unwrap(); // Get MutexGuard
-    let state_rx = state_rx_guard.as_mut().unwrap();
+    let _state_rx = state_rx_guard.as_mut().unwrap();
 
 }
 

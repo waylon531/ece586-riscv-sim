@@ -1,4 +1,3 @@
-use clap::builder::Str;
 use filedescriptor::FileDescriptorTable;
 use termion::raw::IntoRawMode;
 
@@ -18,15 +17,15 @@ pub fn write_newline() {
     write_stdout(match stdout().is_terminal() { true => "\r\n", false => "\n" });
 }
 pub fn clear_term() {
-    if (stdout().is_terminal()) {
+    if stdout().is_terminal() {
         let mut stdout = stdout().into_raw_mode().unwrap();
-        write!(stdout,"{}",termion::clear::All);
+        write!(stdout,"{}",termion::clear::All).unwrap();
     }
 }
 pub fn write_stdout(output: &str) {
-    if (stdout().is_terminal()) {
+    if stdout().is_terminal() {
         let mut stdout = stdout().into_raw_mode().unwrap();
-        write!(stdout,"{}",output);
+        write!(stdout,"{}",output).unwrap();
     } else {
         print!("{}", output);
     }
@@ -40,7 +39,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        let mut e = Environment {
+        let e = Environment {
             fdtable: FileDescriptorTable::new(),
             timer: Instant::now()
         };
@@ -53,6 +52,7 @@ impl Environment {
         
         let mut read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
         let mut read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
+
         match a7 {
             // open(char* pathname, int flags)
             // a0: pathname, a1: flags

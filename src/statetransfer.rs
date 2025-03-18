@@ -1,5 +1,5 @@
 /* struct to represent command sent to machine  */
-enum control_code {
+enum ControlCode {
   RUN,
   STOP,
   STEP,
