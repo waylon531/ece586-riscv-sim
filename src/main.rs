@@ -21,7 +21,7 @@ use std::thread;
 
 use single_value_channel::{channel_starting_with,Updater as SvcSender};
 use crossbeam_channel::{unbounded,Receiver as CbReceiver, Sender as CbSender};
-
+use statetransfer::{MachineState};
 
 #[derive(ValueEnum, Debug, Clone)] // ArgEnum here
 #[clap(rename_all = "kebab_case")]
@@ -36,7 +36,7 @@ enum DumpFmt {
 struct Cli {
     #[arg(short, long)]
     verbose: bool,
-    #[arg(short, long)]
+    #[arg(short, long, alias="silent")]
     quiet: bool,
     #[arg(long)]
     single_step: bool,
@@ -82,10 +82,10 @@ fn main() -> std::io::Result<ExitCode> {
     TODO: create data type for machine state and commands
     
      */
-    let (commands_tx, commands_rx): (CbSender<i32>, CbReceiver<i32>) = unbounded();
+    let (commands_tx, commands_rx): (CbSender<statetransfer::ControlCode>, CbReceiver<statetransfer::ControlCode>) = unbounded();
     
     // Create a channel to send the machine state through to the web UI 
-    let (mut state_rx, state_tx) = channel_starting_with(0);
+    let (mut state_rx, state_tx) = channel_starting_with(MachineState::empty());
     
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable
@@ -102,7 +102,7 @@ fn main() -> std::io::Result<ExitCode> {
     return Ok(ExitCode::from(0));
 }
 
-fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> std::io::Result<ExitCode> {
+fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<statetransfer::ControlCode>>, state_tx: Option<SvcSender<statetransfer::MachineState>>) -> std::io::Result<ExitCode> {
     // Set up input and output
     
     
@@ -138,11 +138,11 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
         cli.stack_addr,
         cli.memory_top,
         mmap.into_boxed_slice(),
+        cli.verbose
     );
 
     // Run the machine to completion
     let result = machine.run(cli.single_step, &stdin, commands_rx,state_tx);
-
     let mut error_message = None;
 
     let status_code = match result {
@@ -167,7 +167,8 @@ fn run_simulator(cli: Cli, commands_rx: Option<CbReceiver<i32>>, state_tx: Optio
     }
 
     // Print the registers one last time
-    if !cli.quiet {
+    // this is silly, but to explain: in normal mode, it prints a real-time display. in quiet mode, it prints nothing. in verbose mode, it dumps in a basic format at every instruction.
+    if !(cli.quiet|cli.verbose) {
 
         environment::clear_term();
         environment::write_stdout(&machine.display_info());

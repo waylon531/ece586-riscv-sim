@@ -20,7 +20,7 @@ use educe::Educe;
 
 use thiserror::Error;
 
-use crate::statetransfer;
+use crate::statetransfer::{self, ControlCode, MachineState};
 use crate::environment::{self, Environment};
 
 #[derive(Serialize)]
@@ -46,11 +46,21 @@ pub struct Machine {
     //
     //       Might be way slow though to iterate through this every cycle though
     breakpoints: Vec<u32>,
+    // store the current instruction as a string, for display
+    cur_inst: String,
+    // store the memory locations that changed since last instruction
+    memory_changes: Vec<(u32,u32)>,
+    // is the machine running?
+    web_runfullspeed: bool,
+    // should we run the next step? (yes I'm VERY aware these conflict with existing variables for the debugger - call it a merge conflict; TODO: consolidate)
+    web_step: bool,
+    verbose: bool,
+    cycle: u128,
     #[serde(skip_serializing)]
     env: Environment
 }
 impl Machine {
-    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>) -> Self{
+    pub fn new(starting_addr: u32, stack_addr: Option<u32>, memory_top: u32, memmap: Box<[u8]>,verbose:bool) -> Self{
         let mut m = Machine {
                     memory: memmap,
                     registers: [0;31],
@@ -58,7 +68,14 @@ impl Machine {
                     pc: starting_addr,
                     pass_breakpoint: false,
                     breakpoints: Vec::new(),
-                    env:Environment::new()
+                    env:Environment::new(),
+                    cur_inst: "".to_string(),
+                    memory_changes: Vec::new(),
+                    web_runfullspeed: true,
+                    web_step: false,
+                    verbose: verbose,
+                    cycle: 0
+                    
         };
         // Set the stack pointer to the lowest invalid memory address by default, aligning down to
         // nearest 16 bytes
@@ -67,12 +84,9 @@ impl Machine {
     }
     /// Run the machine til completion, either running silently until an error is hit or bringing
     /// up the debugger after every step
-    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<i32>>, state_tx: Option<SvcSender<i32>>) -> Result<(),ExecutionError> {
+    pub fn run(&mut self, single_step: bool, _stdin: &Stdin, commands_rx: Option<CbReceiver<statetransfer::ControlCode>>, state_tx: Option<SvcSender<statetransfer::MachineState>>) -> Result<(),ExecutionError> {
         // reset timer
         self.env.reset_timer();
-        /* TODO: Check if commands and state channels are present */
-
-
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
         use std::io::Write;
         let mut should_trigger_cmd = single_step;
@@ -83,12 +97,61 @@ impl Machine {
         // Status messages to print
         let mut status: Vec<String> = Vec::new();
         let mut watchlist: Vec<DebugCommand> = Vec::new();
+        if ! commands_rx.is_none() {
+            self.web_runfullspeed = false;
+        };
         loop {
+            // Stringify the current instruction
+            self.cur_inst = match self.read_instruction_bytes(self.pc) {
+                Ok(bytes) => match Operation::from_bytes(bytes) {
+                    Ok(op) => format!("{}",op),
+                    _ => "invalid".to_owned()
+                },
+                _ => "invalid".to_owned()
+            };
             /*
                 At the start of each cycle, if the web server is running, we want to communicate with it.
                 We exchange information - we send the current state of the machine, and we read commands sent from the web interface.
                 Those commands may include modifications to registers or memory addresses - so we interpret those.
              */
+            match state_tx {
+                Some(ref tx) => {
+                    // send machine state to web ui
+                    let m = MachineState {
+                        pc: self.pc,
+                        registers: self.registers.clone(),
+                        cur_inst: self.cur_inst.clone(),
+                        memory_changes: self.memory_changes.clone(),
+                        cycle: self.cycle
+                    };
+                    tx.update(m).unwrap();
+                },
+                None => {}
+            }
+            let mut web_commands: Vec<ControlCode> = Vec::new();
+            match commands_rx {
+                Some(ref rx) => {
+                    rx.try_iter().for_each(|c| web_commands.push(c));
+                },
+                None => {}
+            }
+            web_commands.iter().for_each(|c| 
+                match c {
+                    ControlCode::STOP => { self.web_runfullspeed = false; }
+                    ControlCode::RUN => { self.web_runfullspeed = true; }
+                    ControlCode::STEP => { self.web_step = true }
+                    ControlCode::POKEREG { register, value } => {
+                        self.registers[register.to_num()] = *value;
+                    },
+                    ControlCode::POKE { address, value } => {
+                        self.memory[*address as usize] = *value as u8;
+                    }
+                    ControlCode::JMP { address } => {
+                        self.pc = *address;
+                    },
+                    _ => {}
+                }
+            );
             // Check if we stepping for N times, and if we are at the end then pull the debugger
             // back up
             // Otherwise decrement the step counter
@@ -196,7 +259,7 @@ impl Machine {
 
                 // Many commands will instantly return control back to the prompt without
                 // stepping execution at all
-                if !run {
+                if !run { // horrible
                     continue;
                 }
 
@@ -205,6 +268,7 @@ impl Machine {
                 last_cmd = command;
 
             }
+            if !(self.web_runfullspeed || self.web_step) { continue };
             match self.step() {
                 Ok(()) => {},
                 // Should errors bail? Or bring up the debugger to explore program state?
@@ -218,11 +282,17 @@ impl Machine {
                 Err(e) => return Err(e)
 
             }
+            if (self.verbose) {
+                println!("              cycle {}", self.cycle);
+                print!("{}", self.dump_state_txt());
+            }
+            self.web_step = false;
+            self.cycle+=1;
             // Check if the user is pressing ctrl-c, and if they are, drop back into the debugger
             // oops this needs a bonus thread, this is going to suck
             // the thread can get spun up whenever we are running and spun down, or paused, when we
             // go to the debugger
-            
+           
         }
         
     }
@@ -568,7 +638,7 @@ impl Machine {
                 match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2], &mut self.memory) {
                     Ok(result) => { self.set_reg(Register::A0, result as u32)},
                     Err(e) => { return Err(e) }
-                };
+                }
                 
             }
 
@@ -712,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_write_u32() {
-        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice());
+        let mut machine = Machine::new(0,Some(0),8,vec![0;4].into_boxed_slice(),false);
         machine.store_word(0xBEE5AA11,0).unwrap();
         for (&mem_value,test_value) in machine.memory.iter().zip([0x11,0xAA,0xE5,0xBE]) {
             assert_eq!(mem_value,test_value);
@@ -721,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_program_completion() {
-        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice());
+        let mut machine = Machine::new(0, Some(0), 32, vec![0; 32].into_boxed_slice(),false);
         let store_a0_42 = 0b0010011 | (Register::A0.to_num() << 7) | (42 << 20);
         let _ = machine.store_word(store_a0_42 as u32,0);
         // JALR to RA
@@ -737,7 +807,7 @@ mod tests {
     proptest! {
         #[test]
         fn load_store_byte_asm(data: u8, s in 16u32..(1<<11)) {
-            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice());
+            let mut machine = Machine::new(0, Some(0), s+4, vec![0; s as usize+4].into_boxed_slice(),false);
             let store_a0_42: u32 = 0b0010011 | ((Register::T1.to_num()as u32) << 7) | ((data as u32) << 20);
             let _ = machine.store_word(store_a0_42 as u32,0);
             println!("S: {}",s);
