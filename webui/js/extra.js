@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", function() {
         t.insertRow();
         for(var c=0;c<8;c++) {
             t.rows[r].insertCell();
-            t.rows[r].cells[c].innerHTML = "<span class='reg-label'>"+regs[(r*8 + c)] + "</span><br><span id='reg-"+(r*c + c) + "' class='reg-value'>0x00</span>";
+            t.rows[r].cells[c].innerHTML = "<span class='reg-label'>"+regs[(r*8 + c)] + "</span><br><span id='reg-"+(r*c + c) + "' class='reg-value'>0x<span contenteditable>00<span></span>";
         }
     } 
 })

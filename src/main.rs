@@ -3,7 +3,7 @@ mod decode;
 mod machine;
 mod opcode;
 mod register;
-mod webui;
+mod api;
 mod statetransfer;
 mod environment;
 
@@ -94,7 +94,7 @@ fn main() -> std::io::Result<ExitCode> {
         });
     });
     let web_server_thread = thread::spawn(|| {
-        webui::run_server(commands_tx, state_rx);
+        api::run_server(commands_tx, state_rx);
     });
     web_server_thread.join().unwrap();
     simulator_thread.join().unwrap();
