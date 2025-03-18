@@ -69,7 +69,7 @@ fn post_control(req: Request) -> Response {
         }
     };
     Response::new()
-    .status_line(format!("HTTP/1.1 {} {}\r\n", code, match code { 500 => "Failed to set state", _ => "OK" })).body(receive_state().into())
+    .status_line(format!("HTTP/1.1 {} {}\r\n", code, match code { 500 => "Failed to set state", _ => "OK" })).mime("application/json").body(receive_state().into())
 }
 
 

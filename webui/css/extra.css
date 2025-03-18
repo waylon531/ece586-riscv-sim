@@ -25,7 +25,8 @@
     width: 100%;
     height: 350px;
 }
-
+.activereg { color: blue; }
+.setreg { color: red !important; }
 .CodeMirror-code div:nth-child(even)  { background-color: rgb(228, 228, 228) }
 .cm-editor .cm-content { font-family: "Consolas" }
 
