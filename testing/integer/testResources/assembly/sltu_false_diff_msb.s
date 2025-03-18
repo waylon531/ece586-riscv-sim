@@ -1,4 +1,4 @@
 addi t2, zero, 1
-addi t0, zero, 0xffff0000
+addi t0, zero, 0xffffFF00
 addi t1, zero, 1
-sltu t2, t0, t1 ; t2 <-- 0 bc t0 !< t1 (unsigned)
+sltu t2, t0, t1 

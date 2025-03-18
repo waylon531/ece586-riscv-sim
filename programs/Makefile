@@ -3,16 +3,19 @@ RVLD:=$(RVGCC)
 #RVLD:=riscv32-unknown-elf-ld
 RVAS:=riscv64-unknown-elf-as
 RVSTRIP:=riscv64-unknown-elf-strip
-CFLAGS:=-fpic -march=rv32i -mabi=ilp32
+ASFLAGS:=-fpic -march=rv32im -mabi=ilp32
+CFLAGS:=$(ASFLAGS) -I./lib/ #-O2 Extra speed :)
+#CFLAGS+=-O2 Extra speed :)
 LIBS:=-lgcc
-LDFLAGS:=$(CFLAGS) -Wl,--gc-sections -nostdlib  -Wl,--strip-all
-TARGETS:=call_subroutine.mem simple_test_mem.mem test_mem.mem
+LDFLAGS:=$(ASFLAGS) -Wl,--gc-sections -nostdlib  -Wl,--strip-all
+TARGETS:=test/call_subroutine.mem test/simple_test_mem.mem test/test_mem.mem test/lbu_test.mem 
+TARGETS+=jpg_decode/jpg_decode.mem checker.mem echo.mem loop_print.mem
 
 all: $(TARGETS)
 
 clean: 
 	rm -f $(TARGETS)
-	rm -f lib/libstartup.o
+	rm -f lib/*.o
 
 %.elf: %.o lib/libstartup.o
 	$(RVLD) $(LDFLAGS) -T linker.ld -o $@ $^ $(LIBS)
@@ -26,5 +29,9 @@ clean:
 	$(RVGCC) $(CFLAGS) -o $@ -c $^ 
 
 %.o: %.s
-	$(RVAS) $(CFLAGS) -o $@ -c $^ 
+	$(RVAS) $(ASFLAGS) -o $@ -c $^ 
+
+jpg_decode/jpg_decode.elf: lib/libstartup.o lib/libremu.o jpg_decode/jpg_decode.o jpg_decode/need_bytes.o picojpeg/picojpeg.o 
+	$(RVLD) $(LDFLAGS) -T linker.ld -o $@ $^ $(LIBS)
+	$(RVSTRIP) -R .comment -R .riscv.attributes $@
 
