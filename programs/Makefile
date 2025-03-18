@@ -8,7 +8,8 @@ CFLAGS:=$(ASFLAGS) -I./lib/ #-O2 Extra speed :)
 #CFLAGS+=-O2 Extra speed :)
 LIBS:=-lgcc
 LDFLAGS:=$(ASFLAGS) -Wl,--gc-sections -nostdlib  -Wl,--strip-all
-TARGETS:=test/call_subroutine.mem test/simple_test_mem.mem test/test_mem.mem test/lbu_test.mem jpg_decode/jpg_decode.mem
+TARGETS:=test/call_subroutine.mem test/simple_test_mem.mem test/test_mem.mem test/lbu_test.mem 
+TARGETS+=jpg_decode/jpg_decode.mem checker.mem echo.mem loop_print.mem
 
 all: $(TARGETS)
 
