@@ -1,3 +1,4 @@
 /target
 .vscode
+.bash_history
 .cargo
