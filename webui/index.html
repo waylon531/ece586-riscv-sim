@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <style>
+    body {
+      padding-top: 5rem;
+    }
+
+    .starter-template {
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+  </style>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <!--<link rel="icon" href="/docs/4.0/assets/img/favicons/favicon.ico">-->
+
+  <title>RISC-V Simulator
+  </title>
+
+
+  <!-- Bootstrap core CSS -->
+  <link href="css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/extra.css" rel="stylesheet">
+  <script type="module" crossorigin src="js/codemirror.js"></script>
+  <link rel="stylesheet" href="css/codemirror.css">
+  <script src="js/extra.js" type="text/JavaScript"></script>
+</head>
+
+<body>
+
+  <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <a class="navbar-brand" href="#">ECE586 RISC-V simulator</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault"
+      aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+        </li>
+
+      </ul>
+    </div>
+  </nav>
+
+  <main role="main" class="container-lg">
+
+    <div class="row outer">
+      <div class="col-md">
+        <div class="row-md fb-container">
+          <h3>Framebuffer</h3>
+          <canvas id="framebuffer"></canvas>
+        </div>
+        <div class="row-lg">
+          <h3>Registers</h3>
+        </div>
+        <table class="table-striped" id="registers">
+
+        </table>
+      </div>
+      <div class="col-md">
+        <div class="row-md">
+          <h3>Controls</h3>
+          <button type="button" class="btn btn-primary" id="run" onclick="sendcmd('run')">Run</button> <button type="button" class="btn btn-primary" id="stop" onclick="sendcmd('stop')">Stop</button> <button type="button" class="btn btn-primary" id="step" onclick="sendcmd('step')">Step Forwards &gt;</button>
+        </div>
+        <div class="" row-md">
+          <h3>Instructions</h3>
+
+        </div>
+      </div>
+      <div class="col-md">
+        <h3>Code</h3>
+        <input type="file" />
+        <textarea id="editor">
+# Write your program here.</textarea>
+        <button type="button" class="btn btn-primary">Compile</button>
+
+      </div>
+
+    </div>
+    <div class="row-sm">
+      <h3>Memory contents</h3>
+    </div>
+    <div class="row outer">
+        
+        <div class="col">
+          <pre class="memory">
+
+          </textarea>
+        </div>
+        <div class="col">
+          <pre class="memory">
+
+          </textarea>
+        </div>
+    </div>
+  </main><!-- /.container -->
+
+  <!-- Bootstrap core JavaScript
+    ================================================== -->
+  <script src="js/jquery.min.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+</body>
+
+</html>
