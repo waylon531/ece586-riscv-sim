@@ -56,7 +56,11 @@ impl FileDescriptorTable {
       Err(e) => { return Err(ReadFileError::ParseError(e.to_string())); }
     };
     let fd = self.assignfd();
-    self.file_descriptors.push(FileDescriptor { file: File::create(fname)?, fd: fd, flags: flags});
+    let f = match has_flag(flags, OpenFlags::OCreat) {
+      True => File::create(fname)?,
+      False => File::open(fname)?
+    };
+    self.file_descriptors.push(FileDescriptor { file: f, fd: fd, flags: flags});
     Ok(fd as i32)
   }
   pub fn close(&mut self, fd:u32) -> i32 {
@@ -83,8 +87,6 @@ impl FileDescriptorTable {
   }
 }
 
-impl FileDescriptor {
-  fn has_flag(&mut self, flag: OpenFlags) -> bool {
-    self.flags & flag as u32 != 0
-  }
+fn has_flag(flags: u32, flag: OpenFlags) -> bool {
+    flags & flag as u32 != 0
 }
