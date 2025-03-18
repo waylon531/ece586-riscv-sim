@@ -34,12 +34,15 @@ jump instruction if the address is not aligned on a 4-byte boundary in memory. I
 _How does one execute and run the test cases?_
 
 There are tests in the source files that can be run using the `cargo test` command. These are also
-run automatically because `cargo test` is run as part of CI.
+run automatically because `cargo test` is run as part of CI. There are demos in
+the `programs/` folder that serve as tests as well, as larger integration tests.
+The most complex of these decodes a jpg image and displays it to a framebuffer.
 
 There are also some tests in `programs/` that use the exit code checking method: `ld_str.mem`’s
 expected return value is 42, and `simple_test_mem.mem` returns the difference between an expected and actual value as the exit code (so 0 indicates correctness). For these tests, there is a makefile (also in `programs/`) to compile/assemble them. The exit code of the emulator will be whatever was in `$a0`, so you can test based off of that. The `--dump-to FILE` option dumps program state at the end of execution and allows you to compare register values to expected values.
 There is also the option of using the `--suppress-status` flag, in which case 0 indicates success
-and 1 indicates that one or more exceptions occurred.
+and 1 indicates that one or more exceptions occurred. As a basic sanity test,
+all tests in `programs/` are compiled, ran, and checked for errors in CI.
 
 In addition to all this, there is a testing framework (on the feature branch `testFramework`), the
 tests for which can be run as follows:
