@@ -3,10 +3,12 @@ use filedescriptor::FileDescriptorTable;
 use termion::raw::IntoRawMode;
 
 use crate::machine::ExecutionError;
+use core::error;
 use std::fs::File;
 use std::os::fd;
 use std::{mem, str};
 use std::time::Instant;
+use std::fmt::Error;
 use std::io::{stdout, IsTerminal, Read, Write};
 mod filedescriptor;
 
@@ -50,15 +52,21 @@ impl Environment {
         self.timer = Instant::now();
     }
     pub fn syscall(&mut self, a7: u32, a0: u32, a1: u32, a2: u32, memory: &mut Box<[u8]>) -> Result<i32, ExecutionError> {
-        
-        let mut read_bytes = |start: u32, len:u32 | -> Vec<u8> { memory[start as usize..len as usize].to_vec() };
-        let mut read_string = |start:u32| -> Vec<u8> { memory[start as usize..(memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' }).unwrap_or(memory.len() - start as usize))].to_vec() };
+    
+        let mut read_string = |start:u32| -> Result<Vec<u8>,ExecutionError> { 
+            // this allows reading the entire memory if string is not terminated. probably shouldn't
+            let strlen = memory[start as usize..].iter().position(|&c| -> bool { c==b'\0' });
+            match strlen {
+                Some(l) => Ok(memory[start as usize..start as usize + l].to_vec()),
+                None => return Err(ExecutionError::IOError(std::io::Error::new(std::io::ErrorKind::Other, "Failed to read filename")))
+            }
+        };
         match a7 {
             // open(char* pathname, int flags)
             // a0: pathname, a1: flags
             // returns file descriptor to a0, or -1 if failed 
             56 => {
-                let filename = read_string(a0);
+                let filename = read_string(a0)?;
                 Ok(self.fdtable.open(&filename, a1).unwrap_or_else(|_|{
                     eprintln!("ENVIRONMENT: Failed to open file: {}",str::from_utf8(&filename).unwrap_or("[garbled nonsense]"));
                     -1
