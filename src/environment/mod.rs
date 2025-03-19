@@ -94,7 +94,7 @@ impl Environment {
                 };
                 if(a1+a2 > memory.len() as u32) { return Err(ExecutionError::LoadAccessFault(a1)) };
                 // Actually write the file's contents to memory
-                memory[a1 as usize..a2 as usize].copy_from_slice(&buf);
+                memory[a1 as usize..a1 as usize+a2 as usize].copy_from_slice(&buf);
                 result
 
             }
@@ -120,7 +120,8 @@ impl Environment {
                         let f_idx = self.fdtable.get_idx(a0);
                         if(f_idx<0) { return Ok(-1) };
                         let mut f = self.fdtable.get_file(a0).unwrap();
-                        f.read(&mut buf).map(|x| x as i32).map_err(|e| ExecutionError::IOError(e))
+                        println!("We have f");
+                        f.write(&mut buf).map(|x| x as i32).map_err(|e| ExecutionError::IOError(e))
                     }
                 };
                 result

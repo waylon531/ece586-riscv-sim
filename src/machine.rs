@@ -667,7 +667,7 @@ impl Machine {
                 // this should definitely be its own module I feel
                 // a7: syscall, a0-a2: arguments
                 match self.env.syscall(self.registers[Register::A7], self.registers[Register::A0],self.registers[Register::A1],self.registers[Register::A2], &mut self.memory) {
-                    Ok(result) => { self.set_reg(Register::A0, result as u32)},
+                    Ok(result) => {self.set_reg(Register::A0, result as u32)},
                     Err(e) => { return Err(e) }
                 }
                 

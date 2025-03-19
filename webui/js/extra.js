@@ -98,6 +98,12 @@ function sendcmd(msg){
         r.forEach((element,i)=>{
             if(i==0) return
             console.log("reg "+i +": "+response.registers[i])
+            var newval = toHex(response.registers[i-1])
+            element.classList.remove("changedreg");
+            if (newval!=element.innerHTML) {
+                console.log("changed "+i)
+                element.classList.add("changedreg");
+            }
             element.innerHTML = toHex(response.registers[i-1])
         })
         //reg-value-num
