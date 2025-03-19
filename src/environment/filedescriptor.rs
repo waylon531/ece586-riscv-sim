@@ -1,6 +1,5 @@
-use std::{collections::VecDeque, fs::{self, File}};
+use std::{collections::VecDeque, fs::{File}};
 
-use serde_json::de::Read;
 
 
 
@@ -67,7 +66,7 @@ impl FileDescriptorTable {
     let idx = self.get_idx(fd);
     // if we can't find the file then error
     // TODO: REFACTOR THIS TO USE RUST'S INBUILT RESULT SYSTEM
-    if(idx<0) { return -1 };
+    if idx<0 { return -1 };
     let i = idx as usize;
     self.freed_fds.push_back(self.file_descriptors[i].fd);
     self.file_descriptors.swap_remove(i);
@@ -76,7 +75,7 @@ impl FileDescriptorTable {
   }
   pub fn get_file(&self, fd:u32) -> Option<&File> {
     let idx = self.get_idx(fd);
-    if(idx<0) { return None };
+    if idx<0 { return None };
     return Some(&self.file_descriptors[idx as usize].file);
   }
   pub fn get_idx(&self, fd:u32) -> i32 {

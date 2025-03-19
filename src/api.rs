@@ -1,6 +1,6 @@
 use std::net::TcpListener;
 use tinyhttp::prelude::*;
-use std::{default, env};
+use std::env;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::fs;
@@ -38,7 +38,7 @@ fn get_assets(req: Request) -> Response {
         .body(file.to_vec())
 }
 #[get("/state")]
-fn get_state(req:Request) -> String {
+fn get_state(_req:Request) -> String {
     receive_state() 
 }
 

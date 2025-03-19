@@ -1,13 +1,15 @@
+mod api;
 mod debugger;
 mod decode;
 #[allow(dead_code)]
 mod devices;
+#[allow(dead_code)]
+mod environment;
 mod machine;
 mod opcode;
 mod register;
-mod api;
+#[allow(dead_code)]
 mod statetransfer;
-mod environment;
 
 use machine::{ExecutionError, Machine};
 use devices::DeviceConfig;
@@ -92,7 +94,7 @@ fn main() -> std::io::Result<ExitCode> {
     let (commands_tx, commands_rx): (CbSender<statetransfer::ControlCode>, CbReceiver<statetransfer::ControlCode>) = unbounded();
     
     // Create a channel to send the machine state through to the web UI 
-    let (mut state_rx, state_tx) = channel_starting_with(MachineState::empty());
+    let (state_rx, state_tx) = channel_starting_with(MachineState::empty());
     
     let simulator_thread = thread::spawn(|| {
         let cli_for_simulator = cli; // Move cli into a new variable

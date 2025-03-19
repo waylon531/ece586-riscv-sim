@@ -1,6 +1,6 @@
 use crate::debugger::{DebugCommand,self};
 use crate::decode::ParseError;
-use crate::devices::{self, Device};
+use crate::devices::{Device};
 use crate::opcode::Operation;
 use crate::register::Register;
 
@@ -87,7 +87,7 @@ impl Machine {
         // reset timer
         self.env.reset_timer();
         // NOTE: this cannot be a global include as it conflicts with fmt::Write;
-        use std::io::Write;
+        
         let should_trigger_cmd = Arc::new(AtomicBool::new(single_step));
         let mut rl = rustyline::DefaultEditor::new()?;
         // Set the default command to step, by default
@@ -266,7 +266,7 @@ impl Machine {
                 Err(e) => return Err(e)
 
             }
-            if (self.verbose) {
+            if self.verbose {
                 println!("              cycle {}", self.cycle);
                 print!("{}", self.dump_state_txt());
             }
