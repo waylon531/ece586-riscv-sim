@@ -47,7 +47,7 @@ impl FileDescriptorTable {
     }
   }
   fn assignfd(&mut self) -> u32 {
-    self.freed_fds.pop_front().unwrap_or(self.file_descriptors.len() as u32 + 2)
+    self.freed_fds.pop_front().unwrap_or(self.file_descriptors.len() as u32 + 3)
   }
   pub fn open(&mut self, filename: &Vec<u8>, flags: u32) -> Result<i32,ReadFileError> {
     let fname = match String::from_utf8(filename.to_vec()) {
@@ -56,8 +56,8 @@ impl FileDescriptorTable {
     };
     let fd = self.assignfd();
     let f = match has_flag(flags, OpenFlags::OCreat) {
-      true => File::create(fname)?,
-      false => File::open(fname)?
+      True => File::options().create(true).read(true).write(true).open(fname)?,
+      False => File::options().create(true).read(true).write(false).open(fname)?,
     };
     self.file_descriptors.push(FileDescriptor { file: f, fd: fd, flags: flags});
     Ok(fd as i32)
