@@ -57,8 +57,8 @@ impl FileDescriptorTable {
     };
     let fd = self.assignfd();
     let f = match has_flag(flags, OpenFlags::OCreat) {
-      True => File::options().read(true).write(true).open(fname)?,
-      False => File::options().read(true).write(false).open(fname)?,
+      True => File::options().create(true).read(true).write(true).open(fname)?,
+      False => File::options().create(true).read(true).write(false).open(fname)?,
     };
     self.file_descriptors.push(FileDescriptor { file: f, fd: fd, flags: flags});
     Ok(fd as i32)

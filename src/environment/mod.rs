@@ -110,10 +110,14 @@ impl Environment {
                         Ok(-1)
                     },
                     1 => {
-                        Ok(std::io::stdout().write(&buf)? as i32)                    
+                        let r =  std::io::stdout().write(&buf)?;
+                        std::io::stdout().flush()?;
+                        Ok(r as i32)                    
                     },
                     2 => {
-                        Ok(std::io::stderr().write(&buf)? as i32)
+                        let r =  std::io::stdout().write(&buf)?;
+                        std::io::stderr().flush()?;
+                        Ok(r as i32)        
                     }
                     _ => {
                         /* TODO: implement flags */
